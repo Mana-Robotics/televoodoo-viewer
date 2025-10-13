@@ -1,0 +1,26 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Voodoo Control Receiver",
+  "version": "0.1.0",
+  "identifier": "com.voodoo.control.receiver",
+  "build": {
+    "beforeDevCommand": "vite",
+    "devUrl": "http://localhost:5173",
+    "beforeBuildCommand": "vite build",
+    "frontendDist": "dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "Voodoo Control Receiver",
+        "width": 1280,
+        "height": 800,
+        "resizable": true
+      }
+    ]
+  },
+  "plugins": {}
+}
+
+
