@@ -1,3 +1,4 @@
 pyobjc; sys_platform == "darwin"
+dbus-next; sys_platform == "linux"
 
 
