@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "voodoo-core"
+version = "0.1.0"
+description = "Core pose types and transformation utilities for Voodoo Control"
+readme = "README.md"
+requires-python = ">=3.8"
+dependencies = [
+  "qrcode",
+  "pyobjc; sys_platform == 'darwin'",
+]
+authors = [{ name = "Voodoo Control" }]
+
+[tool.setuptools]
+packages = ["voodoo_core"]
+
+
