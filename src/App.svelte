@@ -2,6 +2,7 @@
   import Qr from './components/Qr.svelte';
   import OutputConfig from './components/OutputConfig.svelte';
   import PoseValues from './components/PoseValues.svelte';
+  import { logs } from './lib/log';
   import Scene3D from './components/Scene3D.svelte';
   import { onMount } from 'svelte';
   import { startPythonSidecar } from './lib/backend';
@@ -43,26 +44,33 @@
     </section>
 
     <section>
-      <h2 class="text-xl font-semibold mb-2">Scan Reference</h2>
-      <img src={markerUrl} alt="aruco" class="w-48 border border-gray-700" />
-    </section>
-
-    <section>
-      <h2 class="text-xl font-semibold mb-2">Data Output Settings</h2>
-      <OutputConfig on:change={handleConfigChange} bind:selectedOutputMode />
+      <h2 class="text-xl font-semibold mb-2">Connection Logs</h2>
+      <div class="h-64 overflow-auto border border-gray-800 p-2 text-xs space-y-1">
+        {#each $logs as entry}
+          <div class="font-mono"><span class="text-gray-400">[{new Date(entry.ts).toLocaleTimeString()}]</span> [{entry.level}] {entry.message}</div>
+        {/each}
+      </div>
     </section>
   </div>
 
   <!-- Column 2 -->
-  <div class="col-span-6">
+  <div class="col-span-6 space-y-6">
     <section>
       <h2 class="text-xl font-semibold mb-2">3D Visualization</h2>
       <div class="h-[70vh] border border-gray-800"><Scene3D bind:selectedOutputMode /></div>
     </section>
+
+    <section>
+      <OutputConfig on:change={handleConfigChange} bind:selectedOutputMode />
+    </section>
   </div>
 
   <!-- Column 3 -->
-  <div class="col-span-3">
+  <div class="col-span-3 space-y-6">
+    <section>
+      <h2 class="text-xl font-semibold mb-2">Scan Reference</h2>
+      <img src={markerUrl} alt="aruco" class="w-full border border-gray-700" />
+    </section>
     <section>
       <h2 class="text-xl font-semibold mb-2">Pose Values</h2>
       <PoseValues />

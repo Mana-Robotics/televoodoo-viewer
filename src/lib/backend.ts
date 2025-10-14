@@ -14,6 +14,7 @@ function setStatus(next: 'disconnected' | 'connecting' | 'connected') {
 }
 
 export async function startPythonSidecar() {
+  log('info', 'Starting Python sidecar...');
   setStatus('disconnected');
   lastBleActivityMs = 0;
   const unlisten = await listen<string>('python-line', (e) => {
@@ -92,9 +93,16 @@ export async function startPythonSidecar() {
   });
   const unlistenErr = await listen<string>('python-error', (e) => {
     console.error('python stderr:', e.payload);
+    log('error', `python stderr: ${e.payload}`);
     setStatus('disconnected');
   });
-  await invoke('start_python');
+  try {
+    await invoke('start_python');
+    log('info', 'Python sidecar started');
+  } catch (err) {
+    log('error', `Failed to start Python sidecar: ${String(err)}`);
+    setStatus('disconnected');
+  }
   // Start inactivity watchdog: consider disconnected after 10s without BLE activity
   if (inactivityTimer) clearInterval(inactivityTimer);
   inactivityTimer = setInterval(() => {

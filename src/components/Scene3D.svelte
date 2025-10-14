@@ -104,11 +104,11 @@
 
     <!-- Cuboid 0.072 x 0.114 x 0.08 meters -->
     <T.Mesh quaternion={meshQuaternion} position={meshPosition}>
-      <T.BoxGeometry attach={'geometry'} args={[0.072, 0.114, 0.08]} />
+      <T.BoxGeometry attach={'geometry'} args={[0.072, 0.114, 0.008]} />
       <T.MeshStandardMaterial attach={'material'} color={0x2dd4bf} metalness={0.1} roughness={0.6} />
     </T.Mesh>
 
-    <T.PerspectiveCamera position={[2, 2, 2]} fov={36} makeDefault target={[0, 0, 0]}>
+    <T.PerspectiveCamera position={[1.0, 0.9, 1.0]} fov={36} makeDefault target={[0, 0, 0]}>
       <OrbitControls>
         <Gizmo placement={'bottom-left'} size={86} />
       </OrbitControls>
