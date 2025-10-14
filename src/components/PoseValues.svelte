@@ -18,15 +18,7 @@
   }
 </script>
 
-<div class="space-y-4 text-sm">
-  <div>
-    <h3 class="font-semibold mb-1">Connection Logs</h3>
-    <div class="bg-gray-900 border border-gray-800 p-2 h-40 overflow-auto">
-      {#each $logs as l}
-        <div class="leading-tight"><span class="text-gray-500">{new Date(l.ts).toLocaleTimeString()}:</span> [{l.level}] {l.message}</div>
-      {/each}
-    </div>
-  </div>
+<div class="space-y-4 text-sm"> 
   <div>
     <h3 class="font-semibold mb-1">INPUT Pose</h3>
     <pre class="bg-gray-900 border border-gray-800 p-2 overflow-auto">{JSON.stringify(roundForDisplay($inputPose), null, 2)}</pre>

@@ -19,10 +19,9 @@ export function computeOutput(
   config: OutputConfig,
   origin: Pose | null
 ): { output: OutputPayload; newOrigin: Pose | null } {
-  let newOrigin = origin;
-  if (pose.pose_start && !origin) {
-    newOrigin = { ...pose };
-  }
+  // Start of a new pose stream: when pose_start is true, always reset origin
+  // to this first frame, regardless of whether an origin already exists.
+  let newOrigin = pose.pose_start ? { ...pose } : origin;
 
   const include = config.includeFormats;
   const includeOri = config.includeOrientation;
