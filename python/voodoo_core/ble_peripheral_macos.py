@@ -196,7 +196,13 @@ class PeripheralDelegate(NSObject):
 def run_macos_peripheral(name: str, expected_code: str):
     delegate = PeripheralDelegate.alloc().init().setup_(expected_code)
     delegate.local_name = name
-    # Run the main run loop
-    NSRunLoop.mainRunLoop().run()
+    # Prefer a console-friendly event loop that respects Ctrl+C; fallback to NSRunLoop
+    try:
+        from PyObjCTools import AppHelper  # type: ignore
+        # installInterrupt=True makes Ctrl+C (SIGINT) stop the event loop
+        AppHelper.runConsoleEventLoop(installInterrupt=True)
+    except Exception:
+        # Fallback if AppHelper is unavailable
+        NSRunLoop.mainRunLoop().run()
 
 
