@@ -8,13 +8,13 @@
   let quaternion = new THREE.Quaternion(0, 0, 0, 1);
   let position = new THREE.Vector3(0, 0, 0);
 
+
   $: {
     const data = $outputJson as any;
     if (!data) {
       quaternion.set(0, 0, 0, 1);
       position.set(0, 0, 0);
     } else {
-      // Prefer quaternion from selected mode; fallback to absolute_transformed, then absolute_input
       const absT = data?.absolute_transformed;
       const absI = data?.absolute_input;
       const src = (selectedOutputMode === 'absolute_transformed' ? absT : selectedOutputMode === 'absolute_input' ? absI : absT || absI) || {};
@@ -37,12 +37,13 @@
   }
 </script>
 
-  <Canvas background={0x0b0f17} dpr={Math.min(2, window.devicePixelRatio)}>
+<Canvas dpr={Math.min(2, window.devicePixelRatio)}>
   {#key selectedOutputMode}
-    <t-ambientLight intensity={0.5}></t-ambientLight>
-    <t-directionalLight position={[3, 3, 3]} intensity={0.8}></t-directionalLight>
+    <t-color attach={'background'} args={[0x0b0f17]}></t-color>
+    <t-ambientLight intensity={0.6}></t-ambientLight>
+    <t-directionalLight position={[1, 1, 1]} intensity={0.9}></t-directionalLight>
 
-    <!-- Axes helper and labels are simplified -->
+    <!-- Axes helper and labels -->
     <t-axesHelper args={[0.5]}></t-axesHelper>
 
     <!-- Cuboid 0.072 x 0.114 x 0.08 meters -->
@@ -51,7 +52,7 @@
       <t-meshStandardMaterial color={0x2dd4bf}></t-meshStandardMaterial>
     </t-mesh>
 
-    <t-perspectiveCamera position={[0.5, 0.5, 1]} fov={50}></t-perspectiveCamera>
+    <t-perspectiveCamera position={[0.4, 0.35, 0.9]} fov={55}></t-perspectiveCamera>
   {/key}
 </Canvas>
 

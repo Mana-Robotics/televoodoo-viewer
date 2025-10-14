@@ -143,8 +143,12 @@ class PeripheralDelegate(NSObject):
                     print(json.dumps({"type": "ble_control", "cmd": cmd}), flush=True)
                 elif uuid == CHAR_POSE_UUID:
                     js = bytes(data).decode("utf-8")
-                    print(json.dumps({"type": "heartbeat"}), flush=True)
-                    print(json.dumps({"type": "pose", "data": json.loads(js)}), flush=True)
+                    # Forward raw input under absolute_input for frontend; keep heartbeat marker
+                    try:
+                        raw = json.loads(js)
+                        print(json.dumps({"type": "pose", "data": {"absolute_input": raw}}), flush=True)
+                    except Exception as e:
+                        print(json.dumps({"type": "error", "message": f"pose json: {e}"}), flush=True)
             except Exception as e:
                 print(json.dumps({"type": "error", "message": str(e)}), flush=True)
         peripheral.respondToRequest_withResult_(requests[-1], CBATTErrorSuccess)

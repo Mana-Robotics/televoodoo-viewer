@@ -1,6 +1,7 @@
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
-import { bleStatus, outputJson, connectionName, accessCode } from './store';
+import { bleStatus, outputJson, connectionName, accessCode, inputPose, originPose, outputConfig } from './store';
+import { computeOutput } from './transform';
 import { log } from './log';
 
 let currentStatus: 'disconnected' | 'connecting' | 'connected' = 'disconnected';
@@ -24,6 +25,10 @@ export async function startPythonSidecar() {
         accessCode.set(msg.code);
         // session emitted, but not considered connected until heartbeat arrives
         log('info', `Session: name=${msg.name} code=${msg.code}`);
+      } else if (msg.type === 'ble_state') {
+        // ignore detailed adapter state in the simple flow
+      } else if (msg.type === 'ble_service_added' || msg.type === 'ble_advertising' || msg.type === 'ble_advertising_started') {
+        // keep previous behavior: don't alter status until heartbeat/auth
       } else if (msg.type === 'service_heartbeat') {
         // ignore for connection state; only for process liveness
       } else if (msg.type === 'heartbeat') {
@@ -42,7 +47,42 @@ export async function startPythonSidecar() {
         lastBleActivityMs = Date.now();
         log('info', `BLE control: ${msg.cmd}`);
       } else if (msg.type === 'pose') {
-        outputJson.set(msg.data);
+        try {
+          const ai = msg.data?.absolute_input;
+          if (ai) {
+            const pose = {
+              pose_start: !!ai.pose_start,
+              x: Number(ai.x ?? 0),
+              y: Number(ai.y ?? 0),
+              z: Number(ai.z ?? 0),
+              x_rot: Number(ai.x_rot ?? 0),
+              y_rot: Number(ai.y_rot ?? 0),
+              z_rot: Number(ai.z_rot ?? 0),
+              qx: Number(ai.qx ?? 0),
+              qy: Number(ai.qy ?? 0),
+              qz: Number(ai.qz ?? 0),
+              qw: Number(ai.qw ?? 1)
+            };
+            inputPose.set(pose);
+            let currentOrigin: any;
+            originPose.subscribe((v) => (currentOrigin = v))();
+            let cfg: any;
+            outputConfig.subscribe((v) => (cfg = v))();
+            if (!cfg) {
+              cfg = {
+                includeFormats: { absolute_input: true, absolute_transformed: true, delta_input: false, delta_transformed: false },
+                includeOrientation: { quaternion: true, euler_radian: false, euler_degree: false },
+                scale: 1,
+                outputAxes: { x: 1, y: 1, z: 1 }
+              };
+            }
+            const { output, newOrigin } = computeOutput(pose, cfg, currentOrigin ?? null);
+            outputJson.set(output);
+            if (newOrigin !== currentOrigin) originPose.set(newOrigin);
+          }
+        } catch (err) {
+          console.error('pose handling failed', err);
+        }
         // pose messages do not change connection state
         lastBleActivityMs = Date.now();
       }
