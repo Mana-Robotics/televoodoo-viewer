@@ -3,17 +3,125 @@
 use std::io::{BufRead, BufReader};
 use std::process::{Command, Stdio};
 use tauri::Emitter;
+use tauri::Manager; // for app.path()
+
+// simple recursive copy helper for bootstrapping runtime python from resources
+fn copy_dir_all(src: &std::path::Path, dst: &std::path::Path) -> std::io::Result<()> {
+    if !src.exists() {
+        return Ok(());
+    }
+    std::fs::create_dir_all(dst)?;
+    for entry in std::fs::read_dir(src)? {
+        let entry = entry?;
+        let ty = entry.file_type()?;
+        if ty.is_dir() {
+            copy_dir_all(&entry.path(), &dst.join(entry.file_name()))?;
+        } else {
+            std::fs::copy(entry.path(), dst.join(entry.file_name()))?;
+        }
+    }
+    Ok(())
+}
+
+fn find_bundled_python_dir(app: &tauri::AppHandle) -> Option<std::path::PathBuf> {
+    if let Ok(res_dir) = app.path().resource_dir() {
+        let candidate1 = res_dir.join("python");
+        if candidate1.exists() {
+            return Some(candidate1);
+        }
+        let candidate2 = res_dir.join("resources").join("python");
+        if candidate2.exists() {
+            return Some(candidate2);
+        }
+    }
+    None
+}
 
 #[tauri::command]
 async fn start_python(app: tauri::AppHandle) -> Result<(), String> {
-    // Prefer project venv python if present
-    let venv_python = "../python/.venv/bin/python";
-    let python = if std::path::Path::new(venv_python).exists() { venv_python } else { "python3" };
-    let mut child = Command::new(python)
-        .arg("-m")
-        .arg("voodoo_core")
+    // Bootstrap a runtime venv under app data dir on first run using bundled Resources/python
+    let mut python = "python3".to_string();
+    if let Ok(app_data_dir) = app.path().app_data_dir() {
+        let runtime_py_dir = app_data_dir.join("python");
+        let runtime_venv_bin = runtime_py_dir.join(".venv").join("bin");
+        let runtime_python = runtime_venv_bin.join("python");
+        let runtime_pip = runtime_venv_bin.join("pip");
+
+        if !runtime_python.exists() {
+            if let Some(bundled) = find_bundled_python_dir(&app) {
+                let _ = std::fs::create_dir_all(&runtime_py_dir);
+                let _ = copy_dir_all(&bundled, &runtime_py_dir);
+            }
+            let _ = Command::new("python3").arg("-m").arg("venv").arg(runtime_py_dir.join(".venv")).status();
+            if runtime_pip.exists() {
+                let _ = Command::new(&runtime_python).arg("-m").arg("pip").arg("install").arg("-U").arg("pip").status();
+                let req = runtime_py_dir.join("requirements.txt");
+                if req.exists() {
+                    let _ = Command::new(&runtime_python).arg("-m").arg("pip").arg("install").arg("-r").arg(&req).status();
+                }
+                let _ = Command::new(&runtime_python).arg("-m").arg("pip").arg("install").arg(&runtime_py_dir).status();
+            }
+        }
+        if runtime_python.exists() {
+            python = runtime_python.to_string_lossy().to_string();
+        }
+    }
+    // Fallbacks: packaged venv, dev venv, system python3
+    if python == "python3" {
+        if let Some(bundled_py) = find_bundled_python_dir(&app) {
+            let packaged = bundled_py.join(".venv").join("bin").join("python");
+            if packaged.exists() {
+                python = packaged.to_string_lossy().to_string();
+            }
+        }
+    }
+    if python == "python3" {
+        let dev_venv = std::path::Path::new("../python/.venv/bin/python");
+        if dev_venv.exists() {
+            python = dev_venv.to_string_lossy().to_string();
+        }
+    }
+
+    let mut cmd = Command::new(python);
+    cmd.arg("-m").arg("voodoo_core");
+
+    // Prefer Resources/python, then runtime app_data/python, else repo path
+    let mut set_cwd = false;
+    if let Some(bundled_py) = find_bundled_python_dir(&app) {
+        if bundled_py.exists() {
+            cmd.current_dir(&bundled_py);
+            set_cwd = true;
+        }
+    }
+    if !set_cwd {
+        if let Ok(app_data_dir) = app.path().app_data_dir() {
+            let python_dir = app_data_dir.join("python");
+            if python_dir.exists() {
+                cmd.current_dir(&python_dir);
+                set_cwd = true;
+            }
+        }
+    }
+    if !set_cwd {
         // during `tauri dev`, the CWD is typically `src-tauri`, so go up one level
-        .current_dir("../python")
+        cmd.current_dir("../python");
+    }
+
+    // Ensure pyobjc is available in the chosen interpreter; try to install if missing
+    if let Ok(status) = Command::new(&cmd.get_program())
+        .args(["-c", "import objc"]) // simple import test
+        .current_dir(cmd.get_current_dir().unwrap_or_else(|| std::path::Path::new(".")))
+        .status()
+    {
+        if !status.success() {
+            let _ = Command::new(&cmd.get_program())
+                .args(["-m", "pip", "install", "pyobjc"])
+                .current_dir(cmd.get_current_dir().unwrap_or_else(|| std::path::Path::new(".")))
+                .status();
+        }
+    }
+
+    let mut child = cmd
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()

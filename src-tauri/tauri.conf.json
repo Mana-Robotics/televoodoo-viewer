@@ -6,8 +6,8 @@
   "build": {
     "beforeDevCommand": "vite",
     "devUrl": "http://localhost:5173",
-    "beforeBuildCommand": "vite build",
-    "frontendDist": "dist"
+    "beforeBuildCommand": "node ./src-tauri/scripts/prepare-tauri.js && vite build",
+    "frontendDist": "../dist"
   },
   "app": {
     "windows": [
@@ -18,6 +18,11 @@
         "height": 800,
         "resizable": true
       }
+    ]
+  },
+  "bundle": {
+    "resources": [
+      "resources/python"
     ]
   },
   "plugins": {}

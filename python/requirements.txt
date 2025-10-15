@@ -1,3 +1,4 @@
 pyobjc; sys_platform == "darwin"
+qrcode
 
 
