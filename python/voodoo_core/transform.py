@@ -52,6 +52,26 @@ class PoseTransformer:
         vpz = vz + w*tz + (x*ty - y*tx)
         return (vpx, vpy, vpz)
 
+    @staticmethod
+    def _quat_to_euler_xyz(q: Tuple[float, float, float, float]) -> Tuple[float, float, float]:
+        # Convert quaternion to Euler angles (XYZ, radians)
+        x, y, z, w = q
+        # roll (x-axis rotation)
+        sinr_cosp = 2 * (w * x + y * z)
+        cosr_cosp = 1 - 2 * (x * x + y * y)
+        roll = math.atan2(sinr_cosp, cosr_cosp)
+        # pitch (y-axis rotation)
+        sinp = 2 * (w * y - z * x)
+        if abs(sinp) >= 1:
+            pitch = math.copysign(math.pi / 2, sinp)
+        else:
+            pitch = math.asin(sinp)
+        # yaw (z-axis rotation)
+        siny_cosp = 2 * (w * z + x * y)
+        cosy_cosp = 1 - 2 * (y * y + z * z)
+        yaw = math.atan2(siny_cosp, cosy_cosp)
+        return (roll, pitch, yaw)
+
     def _apply_scale(self, value: float) -> float:
         return value * float(self.config.scale)
 
@@ -123,6 +143,16 @@ class PoseTransformer:
             "qz": qrel[2],
             "qw": qrel[3],
         }
+        if self.config.includeOrientation.get("euler_radian"):
+            xr, yr, zr = self._quat_to_euler_xyz(qrel)
+            absolute_transformed.update({"x_rot": xr, "y_rot": yr, "z_rot": zr})
+        if self.config.includeOrientation.get("euler_degree"):
+            xr, yr, zr = self._quat_to_euler_xyz(qrel)
+            absolute_transformed.update({
+                "x_rot_deg": (xr * 180.0 / math.pi),
+                "y_rot_deg": (yr * 180.0 / math.pi),
+                "z_rot_deg": (zr * 180.0 / math.pi),
+            })
 
         delta_transformed = None
         if self._origin is not None:
@@ -136,6 +166,18 @@ class PoseTransformer:
                 "dy": self._apply_scale(ddy * self.config.outputAxes.get("y", 1)),
                 "dz": self._apply_scale(ddz * self.config.outputAxes.get("z", 1)),
             }
+            # include current orientation in delta outputs per UI expectation
+            delta_transformed.update({"qx": qrel[0], "qy": qrel[1], "qz": qrel[2], "qw": qrel[3]})
+            if self.config.includeOrientation.get("euler_radian"):
+                xr, yr, zr = self._quat_to_euler_xyz(qrel)
+                delta_transformed.update({"x_rot": xr, "y_rot": yr, "z_rot": zr})
+            if self.config.includeOrientation.get("euler_degree"):
+                xr, yr, zr = self._quat_to_euler_xyz(qrel)
+                delta_transformed.update({
+                    "x_rot_deg": (xr * 180.0 / math.pi),
+                    "y_rot_deg": (yr * 180.0 / math.pi),
+                    "z_rot_deg": (zr * 180.0 / math.pi),
+                })
 
         result: Dict[str, Any] = {}
         if self.config.includeFormats.get("absolute_input"):

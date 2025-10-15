@@ -41,10 +41,12 @@ class PeripheralDelegate(NSObject):
         self.heartbeat_counter = 0
         self._hb_thread = None
         self._hb_char = None
+        self._cb = None  # optional callback to receive event dicts
         return self
 
-    def setup_(self, code):
+    def setup_(self, code, cb=None):
         self.auth_code = code
+        self._cb = cb
         self.pm = CBPeripheralManager.alloc().initWithDelegate_queue_options_(self, None, None)
         return self
 
@@ -55,7 +57,13 @@ class PeripheralDelegate(NSObject):
         if state == 5:
             self._create_services()
         else:
-            print(json.dumps({"type": "ble_state", "state": int(state)}), flush=True)
+            msg = {"type": "ble_state", "state": int(state)}
+            print(json.dumps(msg), flush=True)
+            if self._cb:
+                try:
+                    self._cb(msg)
+                except Exception:
+                    pass
 
     def _create_services(self):
         # Heartbeat characteristic (Read)
@@ -102,7 +110,13 @@ class PeripheralDelegate(NSObject):
             CBAdvertisementDataLocalNameKey: self._local_name(),
             CBAdvertisementDataServiceUUIDsKey: [CBUUID.UUIDWithString_(SERVICE_UUID)],
         })
-        print(json.dumps({"type": "ble_advertising", "name": self._local_name()}), flush=True)
+        msg = {"type": "ble_advertising", "name": self._local_name()}
+        print(json.dumps(msg), flush=True)
+        if self._cb:
+            try:
+                self._cb(msg)
+            except Exception:
+                pass
         
 
         # start heartbeat counting
@@ -119,7 +133,13 @@ class PeripheralDelegate(NSObject):
                     val = NSData.dataWithBytes_length_(b, len(b))
                     self.pm.updateValue_forCharacteristic_onSubscribedCentrals_(val, self._hb_char, None)
             except Exception as e:
-                print(json.dumps({"type": "error", "message": f"hb_notify: {e}"}), flush=True)
+                msg = {"type": "error", "message": f"hb_notify: {e}"}
+                print(json.dumps(msg), flush=True)
+                if self._cb:
+                    try:
+                        self._cb(msg)
+                    except Exception:
+                        pass
             time.sleep(1.0)
 
     def _local_name(self):
@@ -135,31 +155,79 @@ class PeripheralDelegate(NSObject):
                 if uuid == CHAR_AUTH_UUID:
                     code = bytes(data).decode("utf-8")
                     if code == self.auth_code:
-                        print(json.dumps({"type": "ble_auth_ok"}), flush=True)
+                        msg = {"type": "ble_auth_ok"}
+                        print(json.dumps(msg), flush=True)
+                        if self._cb:
+                            try:
+                                self._cb(msg)
+                            except Exception:
+                                pass
                     else:
-                        print(json.dumps({"type": "ble_auth_failed"}), flush=True)
+                        msg = {"type": "ble_auth_failed"}
+                        print(json.dumps(msg), flush=True)
+                        if self._cb:
+                            try:
+                                self._cb(msg)
+                            except Exception:
+                                pass
                 elif uuid == CHAR_CONTROL_UUID:
                     cmd = bytes(data).decode("utf-8")
-                    print(json.dumps({"type": "ble_control", "cmd": cmd}), flush=True)
+                    msg = {"type": "ble_control", "cmd": cmd}
+                    print(json.dumps(msg), flush=True)
+                    if self._cb:
+                        try:
+                            self._cb(msg)
+                        except Exception:
+                            pass
                 elif uuid == CHAR_POSE_UUID:
                     js = bytes(data).decode("utf-8")
                     # Forward raw input under absolute_input for frontend; keep heartbeat marker
                     try:
                         raw = json.loads(js)
-                        print(json.dumps({"type": "pose", "data": {"absolute_input": raw}}), flush=True)
+                        msg = {"type": "pose", "data": {"absolute_input": raw}}
+                        print(json.dumps(msg), flush=True)
+                        if self._cb:
+                            try:
+                                self._cb(msg)
+                            except Exception:
+                                pass
                     except Exception as e:
-                        print(json.dumps({"type": "error", "message": f"pose json: {e}"}), flush=True)
+                        msg = {"type": "error", "message": f"pose json: {e}"}
+                        print(json.dumps(msg), flush=True)
+                        if self._cb:
+                            try:
+                                self._cb(msg)
+                            except Exception:
+                                pass
             except Exception as e:
-                print(json.dumps({"type": "error", "message": str(e)}), flush=True)
+                msg = {"type": "error", "message": str(e)}
+                print(json.dumps(msg), flush=True)
+                if self._cb:
+                    try:
+                        self._cb(msg)
+                    except Exception:
+                        pass
         peripheral.respondToRequest_withResult_(requests[-1], CBATTErrorSuccess)
 
     # Subscriptions (notifies when a central subscribes to a notifying characteristic; we log anyway)
     def peripheralManager_central_didSubscribeToCharacteristic_(self, pm, central, characteristic):
         try:
             uuid = characteristic.UUID().UUIDString()
-            print(json.dumps({"type": "ble_subscribe", "char": uuid}), flush=True)
+            msg = {"type": "ble_subscribe", "char": uuid}
+            print(json.dumps(msg), flush=True)
+            if self._cb:
+                try:
+                    self._cb(msg)
+                except Exception:
+                    pass
         except Exception as e:
-            print(json.dumps({"type": "error", "message": str(e)}), flush=True)
+            msg = {"type": "error", "message": str(e)}
+            print(json.dumps(msg), flush=True)
+            if self._cb:
+                try:
+                    self._cb(msg)
+                except Exception:
+                    pass
 
     def peripheralManager_central_didUnsubscribeFromCharacteristic_(self, pm, central, characteristic):
         try:
@@ -174,12 +242,22 @@ class PeripheralDelegate(NSObject):
         if error is not None:
             msg["error"] = str(error)
         print(json.dumps(msg), flush=True)
+        if self._cb:
+            try:
+                self._cb(msg)
+            except Exception:
+                pass
 
     def peripheralManagerDidStartAdvertising_error_(self, pm, error):
         msg = {"type": "ble_advertising_started"}
         if error is not None:
             msg["error"] = str(error)
         print(json.dumps(msg), flush=True)
+        if self._cb:
+            try:
+                self._cb(msg)
+            except Exception:
+                pass
 
     # Reads (heartbeat)
     def peripheralManager_didReceiveReadRequest_(self, peripheral, request):
@@ -188,13 +266,19 @@ class PeripheralDelegate(NSObject):
             b = struct.pack('<I', self.heartbeat_counter)
             request.setValue_(NSData.dataWithBytes_length_(b, len(b)))
             peripheral.respondToRequest_withResult_(request, CBATTErrorSuccess)
-            print(json.dumps({"type": "heartbeat"}), flush=True)
+            msg = {"type": "heartbeat"}
+            print(json.dumps(msg), flush=True)
+            if self._cb:
+                try:
+                    self._cb(msg)
+                except Exception:
+                    pass
         else:
             peripheral.respondToRequest_withResult_(request, CBATTErrorSuccess)
 
 
-def run_macos_peripheral(name: str, expected_code: str):
-    delegate = PeripheralDelegate.alloc().init().setup_(expected_code)
+def run_macos_peripheral(name: str, expected_code: str, callback=None):
+    delegate = PeripheralDelegate.alloc().init().setup_(expected_code, callback)
     delegate.local_name = name
     # Prefer a console-friendly event loop that respects Ctrl+C; fallback to NSRunLoop
     try:
