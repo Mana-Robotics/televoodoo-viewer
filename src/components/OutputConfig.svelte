@@ -16,11 +16,26 @@
   };
   let scale = 1.0;
   let outputAxes = { x: 1, y: 1, z: 1 };
+  // Pose of Target Coordinate System relative to reference/world (UI: meters, degrees)
+  let targetPos = { x: 0, y: 0, z: 0 };
+  let targetEulerDeg = { x_rot_deg: 0, y_rot_deg: 0, z_rot_deg: 0 };
+
+  function toRadians(deg: number) { return (deg * Math.PI) / 180; }
+  function toDegrees(rad: number) { return (rad * 180) / Math.PI; }
 
   function emitChange() {
     // This component configures OUTPUT JSON only; visualization always uses INPUT in reference/world coords
-    dispatch('change', { includeFormats, includeOrientation, scale, outputAxes });
-    outputConfig.set({ includeFormats, includeOrientation, scale, outputAxes });
+    // Convert UI degrees to radians for backend/runtime config
+    const targetFrame = {
+      x: Number(targetPos.x) || 0,
+      y: Number(targetPos.y) || 0,
+      z: Number(targetPos.z) || 0,
+      x_rot: toRadians(Number(targetEulerDeg.x_rot_deg) || 0),
+      y_rot: toRadians(Number(targetEulerDeg.y_rot_deg) || 0),
+      z_rot: toRadians(Number(targetEulerDeg.z_rot_deg) || 0),
+    };
+    dispatch('change', { includeFormats, includeOrientation, scale, outputAxes, targetFrame });
+    outputConfig.set({ includeFormats, includeOrientation, scale, outputAxes, targetFrame });
   }
 
   async function saveConfig() {
@@ -28,7 +43,8 @@
     const { writeTextFile } = await import('@tauri-apps/plugin-fs');
     const file = await save({ filters: [{ name: 'JSON', extensions: ['json'] }] });
     if (file) {
-      const payload = { includeFormats, includeOrientation, scale, outputAxes };
+      // Save UI-friendly payload (degrees)
+      const payload = { includeFormats, includeOrientation, scale, outputAxes, targetFrameDegrees: { ...targetPos, ...targetEulerDeg } };
       await writeTextFile(file, JSON.stringify(payload, null, 2));
     }
   }
@@ -44,6 +60,26 @@
       includeOrientation = cfg.includeOrientation ?? includeOrientation;
       scale = cfg.scale ?? scale;
       outputAxes = cfg.outputAxes ?? outputAxes;
+      // Support loading UI degrees or runtime radians or legacy quaternion
+      if (cfg.targetFrameDegrees) {
+        targetPos = { x: cfg.targetFrameDegrees.x ?? 0, y: cfg.targetFrameDegrees.y ?? 0, z: cfg.targetFrameDegrees.z ?? 0 };
+        targetEulerDeg = {
+          x_rot_deg: cfg.targetFrameDegrees.x_rot_deg ?? 0,
+          y_rot_deg: cfg.targetFrameDegrees.y_rot_deg ?? 0,
+          z_rot_deg: cfg.targetFrameDegrees.z_rot_deg ?? 0,
+        };
+      } else if (cfg.targetFrame && typeof cfg.targetFrame.x_rot === 'number') {
+        targetPos = { x: cfg.targetFrame.x ?? 0, y: cfg.targetFrame.y ?? 0, z: cfg.targetFrame.z ?? 0 };
+        targetEulerDeg = {
+          x_rot_deg: toDegrees(cfg.targetFrame.x_rot ?? 0),
+          y_rot_deg: toDegrees(cfg.targetFrame.y_rot ?? 0),
+          z_rot_deg: toDegrees(cfg.targetFrame.z_rot ?? 0),
+        };
+      } else if (cfg.targetFrame && typeof cfg.targetFrame.qx === 'number') {
+        // Legacy quaternion format: cannot directly derive degrees without math; reset to zeros
+        targetPos = { x: cfg.targetFrame.x ?? 0, y: cfg.targetFrame.y ?? 0, z: cfg.targetFrame.z ?? 0 };
+        targetEulerDeg = { x_rot_deg: 0, y_rot_deg: 0, z_rot_deg: 0 };
+      }
       emitChange();
     }
   }
@@ -57,11 +93,16 @@
 <div class="grid grid-cols-3 gap-4">
   <div class="space-y-4 text-sm">
     <div>
-      <label class="block mb-1" for="axes-x">Orientation of OUTPUT coordinate system</label>
-      <div class="flex gap-2">
-        <label class="flex items-center gap-1" for="axes-x"><input id="axes-x" type="number" bind:value={outputAxes.x} class="w-16 bg-gray-900 border border-gray-700 px-2 py-1" on:change={emitChange}/> x</label>
-        <label class="flex items-center gap-1" for="axes-y"><input id="axes-y" type="number" bind:value={outputAxes.y} class="w-16 bg-gray-900 border border-gray-700 px-2 py-1" on:change={emitChange}/> y</label>
-        <label class="flex items-center gap-1" for="axes-z"><input id="axes-z" type="number" bind:value={outputAxes.z} class="w-16 bg-gray-900 border border-gray-700 px-2 py-1" on:change={emitChange}/> z</label>
+      <div class="block mb-1" role="heading" aria-level="3">Pose of Target Coordinate System (relative to reference/world)</div>
+      <div class="grid grid-cols-6 gap-2 items-center">
+        <label class="flex items-center gap-1" for="t-x"><input id="t-x" type="number" bind:value={targetPos.x} class="w-24 bg-gray-900 border border-gray-700 px-2 py-1" on:change={emitChange}/> x <span class="text-gray-400">m</span></label>
+        <label class="flex items-center gap-1" for="t-y"><input id="t-y" type="number" bind:value={targetPos.y} class="w-24 bg-gray-900 border border-gray-700 px-2 py-1" on:change={emitChange}/> y <span class="text-gray-400">m</span></label>
+        <label class="flex items-center gap-1" for="t-z"><input id="t-z" type="number" bind:value={targetPos.z} class="w-24 bg-gray-900 border border-gray-700 px-2 py-1" on:change={emitChange}/> z <span class="text-gray-400">m</span></label>
+      </div>
+      <div class="grid grid-cols-6 gap-2 items-center mt-2">
+        <label class="flex items-center gap-1" for="t-xdeg"><input id="t-xdeg" type="number" bind:value={targetEulerDeg.x_rot_deg} class="w-24 bg-gray-900 border border-gray-700 px-2 py-1" on:change={emitChange}/> x°</label>
+        <label class="flex items-center gap-1" for="t-ydeg"><input id="t-ydeg" type="number" bind:value={targetEulerDeg.y_rot_deg} class="w-24 bg-gray-900 border border-gray-700 px-2 py-1" on:change={emitChange}/> y°</label>
+        <label class="flex items-center gap-1" for="t-zdeg"><input id="t-zdeg" type="number" bind:value={targetEulerDeg.z_rot_deg} class="w-24 bg-gray-900 border border-gray-700 px-2 py-1" on:change={emitChange}/> z°</label>
       </div>
     </div>
     <div>

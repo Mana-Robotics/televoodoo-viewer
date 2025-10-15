@@ -26,6 +26,8 @@ export type OutputConfig = {
   };
   scale: number;
   outputAxes: { x: number; y: number; z: number };
+  // Pose of Target Coordinate System relative to reference/world (Euler radians)
+  targetFrame?: { x: number; y: number; z: number; x_rot: number; y_rot: number; z_rot: number };
 };
 
 

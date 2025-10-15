@@ -50,10 +50,26 @@ export function computeOutput(
     z: p.z * ax.z * scale,
   });
 
+  // Apply target frame transform (reference -> target) if provided
+  // Target pose T (position t, rotation qT). To express a reference pose P in target coords:
+  // p_rel = R_T^T * (p_ref - t), q_rel = qT^{-1} * q_ref
+  const refPos = new THREE.Vector3(pose.x, pose.y, pose.z);
+  const refQuat = new THREE.Quaternion(pose.qx, pose.qy, pose.qz, pose.qw);
+  let targetSpacePos = refPos.clone();
+  let targetSpaceQuat = refQuat.clone();
+  if (config.targetFrame) {
+    const tPos = new THREE.Vector3(config.targetFrame.x, config.targetFrame.y, config.targetFrame.z);
+    const tEuler = new THREE.Euler(config.targetFrame.x_rot, config.targetFrame.y_rot, config.targetFrame.z_rot, 'XYZ');
+    const tQuat = new THREE.Quaternion().setFromEuler(tEuler);
+    const invTQuat = tQuat.clone().invert();
+    targetSpacePos.sub(tPos).applyQuaternion(invTQuat);
+    targetSpaceQuat.premultiply(invTQuat);
+  }
+
   const absolute_transformed: Record<string, unknown> = {
-    ...transformPos(pose),
+    ...transformPos({ x: targetSpacePos.x, y: targetSpacePos.y, z: targetSpacePos.z }),
   };
-  if (includeOri.quaternion) Object.assign(absolute_transformed, { qx: pose.qx, qy: pose.qy, qz: pose.qz, qw: pose.qw });
+  if (includeOri.quaternion) Object.assign(absolute_transformed, { qx: targetSpaceQuat.x, qy: targetSpaceQuat.y, qz: targetSpaceQuat.z, qw: targetSpaceQuat.w });
   if (includeOri.euler_radian) Object.assign(absolute_transformed, { x_rot: er.x_rot, y_rot: er.y_rot, z_rot: er.z_rot });
   if (includeOri.euler_degree) Object.assign(absolute_transformed, { x_rot_deg: ed.x_rot, y_rot_deg: ed.y_rot, z_rot_deg: ed.z_rot });
 
@@ -72,9 +88,10 @@ export function computeOutput(
     if (includeOri.euler_radian) Object.assign(delta_input, { x_rot: er.x_rot, y_rot: er.y_rot, z_rot: er.z_rot });
     if (includeOri.euler_degree) Object.assign(delta_input, { x_rot_deg: ed.x_rot, y_rot_deg: ed.y_rot, z_rot_deg: ed.z_rot });
 
+    // Delta in target coordinates uses same linear transform (rotation cancels when subtracting origin in reference then rotating)
     const dtPos = transformPos({ x: (delta_input.dx as number), y: (delta_input.dy as number), z: (delta_input.dz as number) });
     const delta_transformed: Record<string, unknown> = { ...dtPos };
-    if (includeOri.quaternion) Object.assign(delta_transformed, { qx: pose.qx, qy: pose.qy, qz: pose.qz, qw: pose.qw });
+    if (includeOri.quaternion) Object.assign(delta_transformed, { qx: targetSpaceQuat.x, qy: targetSpaceQuat.y, qz: targetSpaceQuat.z, qw: targetSpaceQuat.w });
     if (includeOri.euler_radian) Object.assign(delta_transformed, { x_rot: er.x_rot, y_rot: er.y_rot, z_rot: er.z_rot });
     if (includeOri.euler_degree) Object.assign(delta_transformed, { x_rot_deg: ed.x_rot, y_rot_deg: ed.y_rot, z_rot_deg: ed.z_rot });
     if (include.delta_input) output.delta_input = delta_input;
