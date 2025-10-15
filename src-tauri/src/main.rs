@@ -48,18 +48,23 @@ async fn start_python(app: tauri::AppHandle) -> Result<(), String> {
         let runtime_pip = runtime_venv_bin.join("pip");
 
         if !runtime_python.exists() {
+            // Only bootstrap from bundled resources if they actually contain a Python package (pyproject.toml)
             if let Some(bundled) = find_bundled_python_dir(&app) {
-                let _ = std::fs::create_dir_all(&runtime_py_dir);
-                let _ = copy_dir_all(&bundled, &runtime_py_dir);
-            }
-            let _ = Command::new("python3").arg("-m").arg("venv").arg(runtime_py_dir.join(".venv")).status();
-            if runtime_pip.exists() {
-                let _ = Command::new(&runtime_python).arg("-m").arg("pip").arg("install").arg("-U").arg("pip").status();
-                let req = runtime_py_dir.join("requirements.txt");
-                if req.exists() {
-                    let _ = Command::new(&runtime_python).arg("-m").arg("pip").arg("install").arg("-r").arg(&req).status();
+                let pyproject = bundled.join("pyproject.toml");
+                if pyproject.exists() {
+                    let _ = std::fs::create_dir_all(&runtime_py_dir);
+                    let _ = copy_dir_all(&bundled, &runtime_py_dir);
+                    let _ = Command::new("python3").arg("-m").arg("venv").arg(runtime_py_dir.join(".venv")).status();
+                    if runtime_pip.exists() {
+                        let _ = Command::new(&runtime_python).arg("-m").arg("pip").arg("install").arg("-U").arg("pip").status();
+                        let req = runtime_py_dir.join("requirements.txt");
+                        if req.exists() {
+                            let _ = Command::new(&runtime_python).arg("-m").arg("pip").arg("install").arg("-r").arg(&req).status();
+                        }
+                        // Install the local package so `-m voodoo_core` works
+                        let _ = Command::new(&runtime_python).arg("-m").arg("pip").arg("install").arg(&runtime_py_dir).status();
+                    }
                 }
-                let _ = Command::new(&runtime_python).arg("-m").arg("pip").arg("install").arg(&runtime_py_dir).status();
             }
         }
         if runtime_python.exists() {
@@ -85,10 +90,10 @@ async fn start_python(app: tauri::AppHandle) -> Result<(), String> {
     let mut cmd = Command::new(python);
     cmd.arg("-m").arg("voodoo_core");
 
-    // Prefer Resources/python, then runtime app_data/python, else repo path
+    // Prefer Resources/python (if valid), then runtime app_data/python (if valid), else repo path
     let mut set_cwd = false;
     if let Some(bundled_py) = find_bundled_python_dir(&app) {
-        if bundled_py.exists() {
+            if bundled_py.join("pyproject.toml").exists() {
             cmd.current_dir(&bundled_py);
             set_cwd = true;
         }
@@ -96,7 +101,7 @@ async fn start_python(app: tauri::AppHandle) -> Result<(), String> {
     if !set_cwd {
         if let Ok(app_data_dir) = app.path().app_data_dir() {
             let python_dir = app_data_dir.join("python");
-            if python_dir.exists() {
+            if python_dir.join("pyproject.toml").exists() {
                 cmd.current_dir(&python_dir);
                 set_cwd = true;
             }
@@ -107,17 +112,20 @@ async fn start_python(app: tauri::AppHandle) -> Result<(), String> {
         cmd.current_dir("../python");
     }
 
-    // Ensure pyobjc is available in the chosen interpreter; try to install if missing
-    if let Ok(status) = Command::new(&cmd.get_program())
-        .args(["-c", "import objc"]) // simple import test
-        .current_dir(cmd.get_current_dir().unwrap_or_else(|| std::path::Path::new(".")))
-        .status()
+    // Only ensure pyobjc on macOS; Linux must not try to install it
+    #[cfg(target_os = "macos")]
     {
-        if !status.success() {
-            let _ = Command::new(&cmd.get_program())
-                .args(["-m", "pip", "install", "pyobjc"])
-                .current_dir(cmd.get_current_dir().unwrap_or_else(|| std::path::Path::new(".")))
-                .status();
+        if let Ok(status) = Command::new(&cmd.get_program())
+            .args(["-c", "import objc"]) // simple import test
+            .current_dir(cmd.get_current_dir().unwrap_or_else(|| std::path::Path::new(".")))
+            .status()
+        {
+            if !status.success() {
+                let _ = Command::new(&cmd.get_program())
+                    .args(["-m", "pip", "install", "pyobjc"])
+                    .current_dir(cmd.get_current_dir().unwrap_or_else(|| std::path::Path::new(".")))
+                    .status();
+            }
         }
     }
 

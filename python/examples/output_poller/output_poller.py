@@ -6,10 +6,11 @@ import time
 from pathlib import Path
 from typing import Any, Dict, Optional
 
+import platform
+import qrcode
+
 from voodoo_core import Pose, OutputConfig, PoseTransformer
 from voodoo_core.ble import generate_session
-from voodoo_core.ble_peripheral_macos import run_macos_peripheral
-import qrcode
 
 
 def load_config(path: Optional[str]) -> OutputConfig:
@@ -155,9 +156,26 @@ def main() -> int:
     signal.signal(signal.SIGINT, lambda *_: stop_run_loop())
     signal.signal(signal.SIGTERM, lambda *_: stop_run_loop())
 
-    # Run BLE peripheral on main thread so CoreBluetooth works and Ctrl+C stops it
+    # Run BLE peripheral appropriate to platform (lazy import to avoid macOS deps on Linux)
     try:
-        run_macos_peripheral(name, code, evt_cb)
+        system = platform.system().lower()
+        distro = ""
+        if system == "linux":
+            try:
+                with open("/etc/os-release", "r", encoding="utf-8") as f:
+                    content = f.read().lower()
+                    if "ubuntu" in content:
+                        distro = "ubuntu"
+            except Exception:
+                pass
+        if system == "darwin":
+            from voodoo_core.ble_peripheral_macos import run_macos_peripheral  # lazy import
+            run_macos_peripheral(name, code, evt_cb)
+        elif system == "linux" and distro == "ubuntu":
+            from voodoo_core.ble_peripheral_ubuntu import run_ubuntu_peripheral  # lazy import
+            run_ubuntu_peripheral(name, code, evt_cb)
+        else:
+            raise RuntimeError(f"Unsupported platform for BLE peripheral: {platform.platform()}")
     except Exception as e:
         print(json.dumps({"type": "error", "message": f"BLE peripheral failed: {e}"}), flush=True)
     return 0

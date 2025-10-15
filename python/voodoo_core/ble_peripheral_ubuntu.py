@@ -3,7 +3,9 @@ import json
 import struct
 import threading
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Callable
+import logging
+import signal
 
 from dbus_next.service import (ServiceInterface, method, dbus_property,
                                PropertyAccess)
@@ -14,6 +16,34 @@ from dbus_next import Variant
 
 # Shared UUIDs with macOS implementation
 SERVICE_UUID = "1C8FD138-FC18-4846-954D-E509366AEF61"
+_evt_cb: Optional[Callable[[Dict[str, Any]], None]] = None
+
+
+def emit_event(evt: Dict[str, Any]) -> None:
+    print(json.dumps(evt), flush=True)
+    cb = _evt_cb
+    if cb is not None:
+        try:
+            cb(evt)
+        except Exception:
+            pass
+
+# Reduce noisy dbus-next internal error logs for benign Property.Set attempts
+logging.getLogger('dbus_next').setLevel(logging.CRITICAL)
+logging.getLogger('dbus_next.message_bus').setLevel(logging.CRITICAL)
+
+class _DbusNoiseFilter(logging.Filter):
+    def filter(self, record: logging.LogRecord) -> bool:
+        msg = record.getMessage()
+        if 'the property is readonly' in msg:
+            return False
+        if 'InterfacesAdded for org.bluez.GattCharacteristic1' in msg:
+            return False
+        if 'does not have property "TxPower"' in msg:
+            return False
+        return True
+
+logging.getLogger().addFilter(_DbusNoiseFilter())
 CHAR_CONTROL_UUID = "1C8FD138-FC18-4846-954D-E509366AEF62"
 CHAR_AUTH_UUID = "1C8FD138-FC18-4846-954D-E509366AEF63"
 CHAR_POSE_UUID = "1C8FD138-FC18-4846-954D-E509366AEF64"
@@ -71,10 +101,10 @@ class GattCharacteristic(ServiceInterface):
 
     @dbus_property(access=PropertyAccess.READ)
     def Value(self) -> "ay":  # type: ignore[override]
-        return list(self._value)
+        return self._value
 
     @method()
-    def ReadValue(self, options: Dict[str, Variant]) -> "ay":  # type: ignore[override]
+    def ReadValue(self, options: 'a{sv}') -> 'ay':  # type: ignore[override]
         # Support offset reads if provided by BlueZ
         try:
             offset_var = options.get("offset")
@@ -88,7 +118,7 @@ class GattCharacteristic(ServiceInterface):
             return list(self._value)
 
     @method()
-    def WriteValue(self, value: List[int], options: Dict[str, Variant]) -> None:  # type: ignore[override]
+    def WriteValue(self, value: 'ay', options: 'a{sv}') -> None:  # type: ignore[override]
         # Respect offset for long writes; we only support offset 0
         try:
             offset_var = options.get("offset")
@@ -106,10 +136,7 @@ class GattCharacteristic(ServiceInterface):
             self.emit_properties_changed({"Notifying": Variant("b", True)})
         except Exception:
             pass
-        try:
-            print(json.dumps({"type": "ble_subscribe", "char": self._uuid}), flush=True)
-        except Exception:
-            pass
+        emit_event({"type": "ble_subscribe", "char": self._uuid})
         # Push current value immediately so subscribers receive something right away
         try:
             if self._value:
@@ -124,18 +151,15 @@ class GattCharacteristic(ServiceInterface):
             self.emit_properties_changed({"Notifying": Variant("b", False)})
         except Exception:
             pass
-        try:
-            print(json.dumps({"type": "ble_unsubscribe", "char": self._uuid}), flush=True)
-        except Exception:
-            pass
+        emit_event({"type": "ble_unsubscribe", "char": self._uuid})
 
     def set_value_and_notify(self, value: bytes) -> None:
         self._value = value
         try:
             # Emit PropertiesChanged for Value to notify subscribers
-            self.emit_properties_changed({"Value": Variant("ay", list(self._value))})
+            self.emit_properties_changed({"Value": Variant("ay", self._value)})
         except Exception as e:  # noqa: BLE001
-            print(json.dumps({"type": "error", "message": f"notify failed: {e}"}), flush=True)
+            emit_event({"type": "error", "message": f"notify failed: {e}"})
 
 
 class HeartbeatCharacteristic(GattCharacteristic):
@@ -156,19 +180,19 @@ class HeartbeatCharacteristic(GattCharacteristic):
                 if self._notifying:
                     self.set_value_and_notify(b)
                     # Log connectivity heartbeat in sync with notifies
-                    print(json.dumps({"type": "heartbeat"}), flush=True)
+                    emit_event({"type": "heartbeat"})
                 time.sleep(1.0)
             except Exception as e:  # noqa: BLE001
-                print(json.dumps({"type": "error", "message": f"hb_loop: {e}"}), flush=True)
+                emit_event({"type": "error", "message": f"hb_loop: {e}"})
 
-    def ReadValue(self, options: Dict[str, Variant]) -> "ay":  # type: ignore[override]
+    def ReadValue(self, options: 'a{sv}') -> 'ay':  # type: ignore[override]
         # Serve current heartbeat value and log a heartbeat read similar to macOS
         try:
             b = struct.pack('<I', self.heartbeat_counter)
             self._value = b
-            print(json.dumps({"type": "heartbeat"}), flush=True)
+            emit_event({"type": "heartbeat"})
         except Exception as e:  # noqa: BLE001
-            print(json.dumps({"type": "error", "message": f"hb_read: {e}"}), flush=True)
+            emit_event({"type": "error", "message": f"hb_read: {e}"})
         return list(self._value)
 
 
@@ -177,46 +201,47 @@ class AuthCharacteristic(GattCharacteristic):
         super().__init__(path, CHAR_AUTH_UUID, service_path, ["write", "write-without-response"])
         self._expected_code = expected_code
 
-    def WriteValue(self, value: List[int], options: Dict[str, Variant]) -> None:  # type: ignore[override]
+    def WriteValue(self, value: 'ay', options: 'a{sv}') -> None:  # type: ignore[override]
         super().WriteValue(value, options)
         try:
             code = bytes(value).decode("utf-8")
             if code == self._expected_code:
-                print(json.dumps({"type": "ble_auth_ok"}), flush=True)
+                emit_event({"type": "ble_auth_ok"})
             else:
-                print(json.dumps({"type": "ble_auth_failed"}), flush=True)
+                emit_event({"type": "ble_auth_failed"})
         except Exception as e:  # noqa: BLE001
-            print(json.dumps({"type": "error", "message": f"auth write: {e}"}), flush=True)
+            emit_event({"type": "error", "message": f"auth write: {e}"})
 
 
 class ControlCharacteristic(GattCharacteristic):
     def __init__(self, path: str, service_path: str):
         super().__init__(path, CHAR_CONTROL_UUID, service_path, ["write", "write-without-response"])
 
-    def WriteValue(self, value: List[int], options: Dict[str, Variant]) -> None:  # type: ignore[override]
+    def WriteValue(self, value: 'ay', options: 'a{sv}') -> None:  # type: ignore[override]
         super().WriteValue(value, options)
         try:
             cmd = bytes(value).decode("utf-8")
-            print(json.dumps({"type": "ble_control", "cmd": cmd}), flush=True)
+            emit_event({"type": "ble_control", "cmd": cmd})
         except Exception as e:  # noqa: BLE001
-            print(json.dumps({"type": "error", "message": f"control write: {e}"}), flush=True)
+            emit_event({"type": "error", "message": f"control write: {e}"})
 
 
 class PoseCharacteristic(GattCharacteristic):
     def __init__(self, path: str, service_path: str):
         super().__init__(path, CHAR_POSE_UUID, service_path, ["write", "write-without-response"])
 
-    def WriteValue(self, value: List[int], options: Dict[str, Variant]) -> None:  # type: ignore[override]
+    def WriteValue(self, value: 'ay', options: 'a{sv}') -> None:  # type: ignore[override]
         super().WriteValue(value, options)
         try:
-            js = bytes(value).decode("utf-8")
+            buf = bytes(value) if not isinstance(value, (bytes, bytearray)) else value
+            js = buf.decode("utf-8")
             try:
                 raw = json.loads(js)
-                print(json.dumps({"type": "pose", "data": {"absolute_input": raw}}), flush=True)
+                emit_event({"type": "pose", "data": {"absolute_input": raw}})
             except Exception as e:  # noqa: BLE001
-                print(json.dumps({"type": "error", "message": f"pose json: {e}"}), flush=True)
+                emit_event({"type": "error", "message": f"pose json: {e}"})
         except Exception as e:  # noqa: BLE001
-            print(json.dumps({"type": "error", "message": f"pose write: {e}"}), flush=True)
+            emit_event({"type": "error", "message": f"pose write: {e}"})
 
 
 class LEAdvertisement(ServiceInterface):
@@ -225,6 +250,8 @@ class LEAdvertisement(ServiceInterface):
         self._path = path
         self._local_name = local_name
         self._service_uuids = service_uuids
+        self._include_tx_power = False
+        self._tx_power = 0  # dBm (int16)
 
     @dbus_property(access=PropertyAccess.READ)
     def Type(self) -> "s":  # type: ignore[override]
@@ -237,6 +264,14 @@ class LEAdvertisement(ServiceInterface):
     @dbus_property(access=PropertyAccess.READ)
     def ServiceUUIDs(self) -> "as":  # type: ignore[override]
         return self._service_uuids
+
+    @dbus_property(access=PropertyAccess.READ)
+    def IncludeTxPower(self) -> "b":  # type: ignore[override]
+        return self._include_tx_power
+
+    @dbus_property(access=PropertyAccess.READ)
+    def TxPower(self) -> "n":  # type: ignore[override]
+        return self._tx_power
 
     @method()
     def Release(self) -> None:  # type: ignore[override]
@@ -259,6 +294,18 @@ class GattApplication(ServiceInterface):
 async def _run_ble_app(name: str, expected_code: str) -> None:
     bus = await MessageBus(bus_type=BusType.SYSTEM).connect()
 
+    # Stop event set by SIGINT/SIGTERM
+    stop_event = asyncio.Event()
+    try:
+        loop = asyncio.get_running_loop()
+        for sig in (signal.SIGINT, signal.SIGTERM):
+            try:
+                loop.add_signal_handler(sig, stop_event.set)
+            except Exception:
+                pass
+    except Exception:
+        pass
+
     # Ensure adapter exists and is powered
     try:
         root_path = "/org/bluez/hci0"
@@ -268,13 +315,11 @@ async def _run_ble_app(name: str, expected_code: str) -> None:
         powered_var = await props.call_get("org.bluez.Adapter1", "Powered")
         powered = bool(powered_var.value)
         if not powered:
-            try:
-                await props.call_set("org.bluez.Adapter1", "Powered", Variant("b", True))
-            except Exception:
-                # Not fatal; user may need to enable Bluetooth
-                pass
+            # Do not try to set adapter power here (requires privileges and causes noisy errors).
+            # Instead, emit a helpful message and continue.
+            emit_event({"type": "warn", "message": "Bluetooth adapter is off. Run 'bluetoothctl power on' and retry."})
     except Exception as e:  # noqa: BLE001
-        print(json.dumps({"type": "error", "message": f"adapter check: {e}"}), flush=True)
+        emit_event({"type": "error", "message": f"adapter check: {e}"})
 
     # Build GATT tree
     app_path = "/org/voodoocontrol/app"
@@ -346,38 +391,56 @@ async def _run_ble_app(name: str, expected_code: str) -> None:
     # Register GATT application
     try:
         await gatt_manager.call_register_application(app_path, {})
-        print(json.dumps({"type": "ble_service_added", "uuid": SERVICE_UUID}), flush=True)
+        emit_event({"type": "ble_service_added", "uuid": SERVICE_UUID})
     except Exception as e:  # noqa: BLE001
-        print(json.dumps({"type": "error", "message": f"RegisterApplication: {e}"}), flush=True)
+        emit_event({"type": "error", "message": f"RegisterApplication: {e}"})
 
     # Register advertisement (using adapter root object for manager)
     adv_path = "/org/voodoocontrol/adv0"
     adv = LEAdvertisement(adv_path, name, [SERVICE_UUID])
     bus.export(adv_path, adv)
+    adv_manager = None
     try:
         adapter_root = "/org/bluez/hci0"
         adv_introspection = await bus.introspect("org.bluez", adapter_root)
         adv_obj = bus.get_proxy_object("org.bluez", adapter_root, adv_introspection)
         adv_manager = adv_obj.get_interface("org.bluez.LEAdvertisingManager1")
         await adv_manager.call_register_advertisement(adv_path, {})
-        print(json.dumps({"type": "ble_advertising", "name": name}), flush=True)
-        print(json.dumps({"type": "ble_advertising_started"}), flush=True)
+        emit_event({"type": "ble_advertising", "name": name})
+        emit_event({"type": "ble_advertising_started"})
     except Exception as e:  # noqa: BLE001
-        print(json.dumps({"type": "error", "message": f"RegisterAdvertisement: {e}"}), flush=True)
+        emit_event({"type": "error", "message": f"RegisterAdvertisement: {e}"})
 
-    # Keep running forever
-    while True:
-        await asyncio.sleep(3600)
-
-
-def run_ubuntu_peripheral(name: str, expected_code: str) -> None:
+    # Wait for Ctrl+C / SIGTERM
     try:
+        await stop_event.wait()
+    finally:
+        # Cleanup: unregister advertisement and application
+        try:
+            if adv_manager is not None:
+                await adv_manager.call_unregister_advertisement(adv_path)
+        except Exception:
+            pass
+        try:
+            await gatt_manager.call_unregister_application(app_path, {})
+        except Exception:
+            pass
+        try:
+            bus.disconnect()
+        except Exception:
+            pass
+
+
+def run_ubuntu_peripheral(name: str, expected_code: str, callback: Optional[Callable[[Dict[str, Any]], None]] = None) -> None:
+    try:
+        global _evt_cb
+        _evt_cb = callback
         # Kick off asyncio loop and run until cancelled
         asyncio.run(_run_ble_app(name, expected_code))
     except KeyboardInterrupt:
         pass
     except Exception as e:  # noqa: BLE001
-        print(json.dumps({"type": "error", "message": f"BLE peripheral failed: {e}"}), flush=True)
+        emit_event({"type": "error", "message": f"BLE peripheral failed: {e}"})
 
 
 
