@@ -5,7 +5,7 @@ import threading
 import time
 from voodoo_core.ble import generate_session, run_simulation
 from voodoo_core.transform import OutputConfig, PoseTransformer
-from voodoo_core.ble_peripheral_macos import run_macos_peripheral
+import platform
 
 
 def main() -> int:
@@ -48,9 +48,28 @@ def main() -> int:
 
     threading.Thread(target=heartbeat, daemon=True).start()
 
-    # start BLE peripheral (macOS)
+    # start BLE peripheral based on platform
     try:
-        run_macos_peripheral(name, code)
+        system = platform.system().lower()
+        distro = ""
+        if system == "linux":
+            # Try to detect Ubuntu via /etc/os-release
+            try:
+                with open("/etc/os-release", "r", encoding="utf-8") as f:
+                    content = f.read().lower()
+                    if "ubuntu" in content:
+                        distro = "ubuntu"
+            except Exception:
+                pass
+
+        if system == "darwin":
+            from voodoo_core.ble_peripheral_macos import run_macos_peripheral  # lazy import
+            run_macos_peripheral(name, code)
+        elif system == "linux" and distro == "ubuntu":
+            from voodoo_core.ble_peripheral_ubuntu import run_ubuntu_peripheral  # lazy import
+            run_ubuntu_peripheral(name, code)
+        else:
+            raise RuntimeError(f"Unsupported platform for BLE peripheral: {platform.platform()}")
     except Exception as e:
         print(json.dumps({"type": "error", "message": f"BLE peripheral failed: {e}"}), flush=True)
 

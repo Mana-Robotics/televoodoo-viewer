@@ -11,6 +11,7 @@ requires-python = ">=3.8"
 dependencies = [
   "qrcode",
   "pyobjc; sys_platform == 'darwin'",
+  "dbus-next; sys_platform == 'linux'",
 ]
 authors = [{ name = "Voodoo Control" }]
 
