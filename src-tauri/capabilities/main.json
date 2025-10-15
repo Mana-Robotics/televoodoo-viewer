@@ -7,7 +7,12 @@
     "core:event:default",
     "core:event:allow-listen",
     "dialog:default",
-    "fs:default"
+    { "identifier": "dialog:allow-save" },
+    "fs:default",
+    { "identifier": "fs:allow-write", "scopes": ["**"] },
+    { "identifier": "fs:allow-write-file", "scopes": ["**"] },
+    { "identifier": "fs:allow-write-text-file", "scopes": ["**"] },
+    { "identifier": "fs:allow-mkdir", "scopes": ["**"] }
   ]
 }
 

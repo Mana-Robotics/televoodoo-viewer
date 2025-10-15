@@ -41,11 +41,18 @@
   async function saveConfig() {
     const { save } = await import('@tauri-apps/plugin-dialog');
     const { writeTextFile } = await import('@tauri-apps/plugin-fs');
-    const file = await save({ filters: [{ name: 'JSON', extensions: ['json'] }] });
-    if (file) {
-      // Save UI-friendly payload (degrees)
-      const payload = { includeFormats, includeOrientation, scale, outputAxes, targetFrameDegrees: { ...targetPos, ...targetEulerDeg } };
-      await writeTextFile(file, JSON.stringify(payload, null, 2));
+    try {
+      const file = await save({ defaultPath: 'voodoo_settings.json', filters: [{ name: 'JSON', extensions: ['json'] }] });
+      if (file) {
+        // Ensure .json extension
+        let path = String(file);
+        if (!path.toLowerCase().endsWith('.json')) path = path + '.json';
+        // Save UI-friendly payload (degrees)
+        const payload = { includeFormats, includeOrientation, scale, outputAxes, targetFrameDegrees: { ...targetPos, ...targetEulerDeg } };
+        await writeTextFile(path, JSON.stringify(payload, null, 2));
+      }
+    } catch (e) {
+      console.error('Failed to save settings:', e);
     }
   }
 
