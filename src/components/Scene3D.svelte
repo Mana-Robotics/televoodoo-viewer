@@ -123,6 +123,11 @@
        Shown at target frame pose relative to world/reference -->
   <T.Group position={targetAxesPos} quaternion={targetAxesQuat}>
     <T.AxesHelper args={[0.4]} />
+    <!-- Red cuboid showing OUTPUT pose in target coordinate system (local to target frame) -->
+    <T.Mesh quaternion={outQuaternion} position={outPosition}>
+      <T.BoxGeometry attach={'geometry'} args={[0.114, 0.072, 0.008]} />
+      <T.MeshStandardMaterial attach={'material'} color={0xff4444} metalness={0.1} roughness={0.6} />
+    </T.Mesh>
   </T.Group>
 
   <!-- Cuboid 0.072 x 0.114 x 0.08 meters -->
@@ -131,11 +136,7 @@
     <T.MeshStandardMaterial attach={'material'} color={0x2dd4bf} metalness={0.1} roughness={0.6} />
   </T.Mesh>
 
-  <!-- Red cuboid showing OUTPUT pose in target coordinate system -->
-  <T.Mesh quaternion={outQuaternion} position={outPosition}>
-    <T.BoxGeometry attach={'geometry'} args={[0.114, 0.072, 0.008]} />
-    <T.MeshStandardMaterial attach={'material'} color={0xff4444} metalness={0.1} roughness={0.6} />
-  </T.Mesh>
+  
 
   <T.PerspectiveCamera position={[1.0, 0.9, 1.0]} fov={36} makeDefault target={[0, 0, 0]}>
     <OrbitControls>
