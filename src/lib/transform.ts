@@ -14,6 +14,10 @@ export function radiansToDegrees(e: { x_rot: number; y_rot: number; z_rot: numbe
   return { x_rot: e.x_rot * r2d, y_rot: e.y_rot * r2d, z_rot: e.z_rot * r2d };
 }
 
+// INPUT pose values are expressed in the reference coordinate system defined by the
+// scanned/printed ArUco marker. The visualization world equals this reference system.
+// This function produces OUTPUT JSON variants based on configuration; position transforms
+// (scale/axis multipliers) are applied relative to the same reference system.
 export function computeOutput(
   pose: Pose,
   config: OutputConfig,

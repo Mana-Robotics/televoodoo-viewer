@@ -3,7 +3,6 @@
   import { outputConfig } from '../lib/store';
   const dispatch = createEventDispatcher();
 
-  export let selectedOutputMode: 'absolute_input' | 'delta_input' | 'absolute_transformed' | 'delta_transformed' = 'absolute_transformed';
   let includeFormats = {
     absolute_input: true,
     delta_input: false,
@@ -19,7 +18,8 @@
   let outputAxes = { x: 1, y: 1, z: 1 };
 
   function emitChange() {
-    dispatch('change', { includeFormats, includeOrientation, scale, outputAxes, selectedOutputMode });
+    // This component configures OUTPUT JSON only; visualization always uses INPUT in reference/world coords
+    dispatch('change', { includeFormats, includeOrientation, scale, outputAxes });
     outputConfig.set({ includeFormats, includeOrientation, scale, outputAxes });
   }
 
@@ -28,7 +28,7 @@
     const { writeTextFile } = await import('@tauri-apps/plugin-fs');
     const file = await save({ filters: [{ name: 'JSON', extensions: ['json'] }] });
     if (file) {
-      const payload = { includeFormats, includeOrientation, scale, outputAxes, selectedOutputMode };
+      const payload = { includeFormats, includeOrientation, scale, outputAxes };
       await writeTextFile(file, JSON.stringify(payload, null, 2));
     }
   }
@@ -44,7 +44,6 @@
       includeOrientation = cfg.includeOrientation ?? includeOrientation;
       scale = cfg.scale ?? scale;
       outputAxes = cfg.outputAxes ?? outputAxes;
-      selectedOutputMode = cfg.selectedOutputMode ?? selectedOutputMode;
       emitChange();
     }
   }
@@ -74,7 +73,7 @@
   <div class="space-y-4 text-sm">
 
     <div>
-      <label class="block mb-1">Include in OUTPUT JSON</label>
+      <div class="block mb-1" role="heading" aria-level="3">Include in OUTPUT JSON</div>
       <div class="grid grid-cols-1 gap-1">
         <label class="flex items-center gap-2" for="fmt-abs-in"><input id="fmt-abs-in" type="checkbox" bind:checked={includeFormats.absolute_input} on:change={emitChange}/> absolute INPUT pose data</label>
         <label class="flex items-center gap-2" for="fmt-delta-in"><input id="fmt-delta-in" type="checkbox" bind:checked={includeFormats.delta_input} on:change={emitChange}/> delta of INPUT pose data since begin</label>
@@ -86,22 +85,14 @@
 
   <div class="space-y-4 text-sm">
     <div>
-      <label class="block mb-1">Pose orientation values</label>
+      <div class="block mb-1" role="heading" aria-level="3">Pose orientation values</div>
       <div class="grid grid-cols-1 gap-1">
         <label class="flex items-center gap-2" for="ori-q"><input id="ori-q" type="checkbox" bind:checked={includeOrientation.quaternion} on:change={emitChange}/> quaternion</label>
         <label class="flex items-center gap-2" for="ori-er"><input id="ori-er" type="checkbox" bind:checked={includeOrientation.euler_radian} on:change={emitChange}/> euler radian</label>
         <label class="flex items-center gap-2" for="ori-ed"><input id="ori-ed" type="checkbox" bind:checked={includeOrientation.euler_degree} on:change={emitChange}/> euler degree</label>
       </div>
     </div>
-    <div>
-      <label class="block mb-1" for="viz-src">Visualization source</label>
-      <select id="viz-src" bind:value={selectedOutputMode} class="bg-gray-900 border border-gray-700 px-2 py-1" on:change={emitChange}>
-        <option value="absolute_input">Absolute INPUT</option>
-        <option value="delta_input">Delta INPUT</option>
-        <option value="absolute_transformed">Absolute Transformed</option>
-        <option value="delta_transformed">Delta Transformed</option>
-      </select>
-    </div>
+    <!-- Visualization always uses INPUT (reference/world). No selector needed. -->
 
 
   </div>

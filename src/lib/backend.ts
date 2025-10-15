@@ -64,6 +64,7 @@ export async function startPythonSidecar() {
               qz: Number(ai.qz ?? 0),
               qw: Number(ai.qw ?? 1)
             };
+            // INPUT pose is in reference coordinate system (equals visualization world)
             inputPose.set(pose);
             let currentOrigin: any;
             originPose.subscribe((v) => (currentOrigin = v))();

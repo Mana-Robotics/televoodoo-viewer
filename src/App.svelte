@@ -22,7 +22,7 @@
     startPythonSidecar();
     return () => unsub.forEach((u) => u());
   });
-  let selectedOutputMode: 'absolute_input' | 'delta_input' | 'absolute_transformed' | 'delta_transformed' = 'absolute_transformed';
+  // Visualization uses INPUT pose in reference/world coords; OUTPUT mode only affects JSON
 
   function handleConfigChange(event: CustomEvent) {
     // Placeholder: wire into Tauri backend persistence later
@@ -56,12 +56,13 @@
   <!-- Column 2 -->
   <div class="col-span-6 space-y-6">
     <section>
-      <h2 class="text-xl font-semibold mb-2">3D Visualization</h2>
-      <div class="h-[70vh] border border-gray-800"><Scene3D bind:selectedOutputMode /></div>
+      <h2 class="text-xl font-semibold mb-1">3D Visualization</h2>
+      <div class="text-xs text-gray-400 mb-2">World = reference coordinate system (ArUco); cuboid uses INPUT pose</div>
+      <div class="h-[70vh] border border-gray-800"><Scene3D /></div>
     </section>
 
     <section>
-      <OutputConfig on:change={handleConfigChange} bind:selectedOutputMode />
+      <OutputConfig on:change={handleConfigChange} />
     </section>
   </div>
 

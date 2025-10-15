@@ -59,10 +59,11 @@ THE GUI shall be structured as follows:
     - Column 2 (main view - 2x as wide as Column 1 and 3):
         - Title "3D Visualization"
         - Display a 3D view of a cuboid with the dimensions 0.072 x 0.114 x 0.08 meters 
-        - in a 3d Space with x,y,z axis ranging from -0.5 to 0.5 metres each
-        - add coordinate axis and coresponding labels x,y,z colored r,g,b
-        - move and rotate the cuboids pose according to a selected current OUTPUT data pose (only use quaternion rotation values as source of truth)
-        - allow user to choose between all of the offered output formats (poses only with quaternion rotations, velocities) defined under "OUTPUT CONFIGURATION"
+        - in a 3D space with x,y,z axis ranging from -0.5 to 0.5 metres each
+        - add coordinate axis and corresponding labels x,y,z colored r,g,b
+        - World coordinate system equals the reference coordinate system (defined by the ArUco marker)
+        - Move and rotate the cuboid according to the INPUT pose values (quaternion for orientation)
+        - OUTPUT formats and transforms affect only the JSON output, not the visualization
 
     - Column 3:
         - Title "Pose Values"

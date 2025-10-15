@@ -2,10 +2,12 @@
   import { Canvas, T } from '@threlte/core';
   import { Gizmo, OrbitControls, Grid } from '@threlte/extras';
   import * as THREE from 'three';
-  import { outputJson } from '../lib/store';
+  import { inputPose } from '../lib/store';
   import { onMount } from 'svelte';
 
-  export let selectedOutputMode: 'absolute_input' | 'delta_input' | 'absolute_transformed' | 'delta_transformed' = 'absolute_transformed';
+  // Visualization world coordinate system equals the reference coordinate system
+  // defined by the scanned/printed ArUco marker. The cuboid pose is always taken
+  // from the INPUT pose values (reference/world coordinates).
 
   let quaternion = new THREE.Quaternion(0, 0, 0, 1);
   let position = new THREE.Vector3(0, 0, 0);
@@ -44,45 +46,25 @@
 
 
   $: {
-    const data = $outputJson as any;
-    if (!data) {
+    const p = $inputPose as any;
+    if (!p) {
       quaternion.set(0, 0, 0, 1);
       position.set(0, 0, 0);
     } else {
-      const absT = data?.absolute_transformed;
-      const absI = data?.absolute_input;
-      const dT = data?.delta_transformed;
-      const dI = data?.delta_input;
-
-      // Select orientation source: prefer the selected dataset's quaternion, fallback to absT, then absI
-      const oriSrc =
-        (selectedOutputMode === 'absolute_transformed' && absT) ||
-        (selectedOutputMode === 'absolute_input' && absI) ||
-        (selectedOutputMode === 'delta_transformed' && dT) ||
-        (selectedOutputMode === 'delta_input' && dI) ||
-        absT ||
-        absI ||
-        {};
       if (
-        typeof oriSrc.qx === 'number' &&
-        typeof oriSrc.qy === 'number' &&
-        typeof oriSrc.qz === 'number' &&
-        typeof oriSrc.qw === 'number'
+        typeof p.qx === 'number' &&
+        typeof p.qy === 'number' &&
+        typeof p.qz === 'number' &&
+        typeof p.qw === 'number'
       ) {
-        quaternion.set(oriSrc.qx, oriSrc.qy, oriSrc.qz, oriSrc.qw);
+        quaternion.set(p.qx, p.qy, p.qz, p.qw);
       }
-
-      // Select position source based on selected mode
-      if (selectedOutputMode === 'absolute_transformed' || selectedOutputMode === 'absolute_input') {
-        const p = data[selectedOutputMode];
-        if (p && typeof p.x === 'number' && typeof p.y === 'number' && typeof p.z === 'number') {
-          position.set(p.x, p.y, p.z);
-        }
-      } else if (selectedOutputMode === 'delta_transformed' || selectedOutputMode === 'delta_input') {
-        const d = data[selectedOutputMode];
-        if (d && typeof d.dx === 'number' && typeof d.dy === 'number' && typeof d.dz === 'number') {
-          position.set(d.dx, d.dy, d.dz);
-        }
+      if (
+        typeof p.x === 'number' &&
+        typeof p.y === 'number' &&
+        typeof p.z === 'number'
+      ) {
+        position.set(p.x, p.y, p.z);
       }
     }
     // reflect updates to props consumed by <T.Mesh>
@@ -93,7 +75,7 @@
 
 <div class="h-full w-full" bind:this={containerEl}>
 <Canvas dpr={Math.min(2, window.devicePixelRatio)}>
-  {#key selectedOutputMode}
+  {#key meshQuaternion.join(',') + '|' + meshPosition.join(',')}
     <T.Color attach={'background'} args={[0x0b0f17]} />
     <T.AmbientLight intensity={0.6} />
     <T.DirectionalLight position={[1, 1, 1]} intensity={0.9} />

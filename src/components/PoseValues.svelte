@@ -20,7 +20,7 @@
 
 <div class="space-y-4 text-sm"> 
   <div>
-    <h3 class="font-semibold mb-1">INPUT Pose</h3>
+    <h3 class="font-semibold mb-1">INPUT Pose (reference/world)</h3>
     <pre class="bg-gray-900 border border-gray-800 p-2 overflow-auto">{JSON.stringify(roundForDisplay($inputPose), null, 2)}</pre>
   </div>
   <div>

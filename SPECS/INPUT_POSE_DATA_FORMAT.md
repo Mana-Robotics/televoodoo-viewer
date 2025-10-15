@@ -1,7 +1,7 @@
 # Voodoo Control - Pose Data Format
 
 ## Overview
-Voodoo Control now accepts pose tracking data via Bluetooth Low Energy (BLE) instead of cursor control. The app displays real-time pose data in a graphical window.
+Voodoo Control receives pose tracking data via Bluetooth Low Energy (BLE). All INPUT pose values are expressed in the reference coordinate system defined by the scanned/printed ArUco marker. The 3D visualization world coordinate system equals this reference coordinate system.
 
 ## JSON Payload Format
 
@@ -23,7 +23,7 @@ The app expects the following JSON structure to be sent via the BLE characterist
 }
 ```
 
-### Field Descriptions
+### Field Descriptions (reference/world coordinates)
 
 - **pose_start** (boolean): Indicates whether pose tracking is active
 - **x** (double): Position along X-axis (in meters)
@@ -82,7 +82,7 @@ The pose data should be sent to the same BLE characteristic that was previously 
 
 ## Display Window
 
-The app displays the pose data in a floating window that shows:
+The app displays the pose data and a 3D scene where world = reference coordinate system. The cuboid pose in the scene uses the INPUT pose directly. The UI shows:
 - Pose start status (active/inactive indicator)
 - Current position values (X, Y, Z)
 - Current Euler rotation values (X, Y, Z)
