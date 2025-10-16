@@ -1,4 +1,7 @@
 import json
+import platform
+from typing import Callable, Dict, Any, Optional
+import qrcode
 import random
 import string
 import time
@@ -36,5 +39,47 @@ def simulate_pose_stream() -> Iterator[Pose]:
 def run_simulation(on_pose: Callable[[Pose], None]) -> None:
     for p in simulate_pose_stream():
         on_pose(p)
+
+
+def _print_session_and_qr(name: str, code: str) -> None:
+    print(json.dumps({"type": "session", "name": name, "code": code}), flush=True)
+    try:
+        payload = json.dumps({"name": name, "code": code})
+        qr = qrcode.QRCode(border=1)
+        qr.add_data(payload)
+        qr.make()
+        qr.print_ascii(invert=True)
+    except Exception:
+        # QR printing is best-effort; session JSON is already printed
+        pass
+
+
+def start_peripheral(callback: Optional[Callable[[Dict[str, Any]], None]] = None) -> None:
+    """Generate a session, print JSON and QR, and start the platform BLE peripheral."""
+    name, code = generate_session()
+    _print_session_and_qr(name, code)
+
+    system = platform.system().lower()
+    distro = ""
+    if system == "linux":
+        try:
+            with open("/etc/os-release", "r", encoding="utf-8") as f:
+                content = f.read().lower()
+                if "ubuntu" in content:
+                    distro = "ubuntu"
+        except Exception:
+            pass
+
+    try:
+        if system == "darwin":
+            from voodoo_core.ble_peripheral_macos import run_macos_peripheral  # lazy import
+            run_macos_peripheral(name, code, callback)
+        elif system == "linux" and distro == "ubuntu":
+            from voodoo_core.ble_peripheral_ubuntu import run_ubuntu_peripheral  # lazy import
+            run_ubuntu_peripheral(name, code, callback)
+        else:
+            raise RuntimeError(f"Unsupported platform for BLE peripheral: {platform.platform()}")
+    except Exception as e:
+        print(json.dumps({"type": "error", "message": f"BLE peripheral failed: {e}"}), flush=True)
 
 

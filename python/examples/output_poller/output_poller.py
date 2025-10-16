@@ -6,11 +6,8 @@ import time
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-import platform
-import qrcode
-
 from voodoo_core import Pose, OutputConfig, PoseTransformer
-from voodoo_core.ble import generate_session
+from voodoo_core.ble import generate_session, start_peripheral
 
 
 def load_config(path: Optional[str]) -> OutputConfig:
@@ -82,16 +79,7 @@ def main() -> int:
     parser.add_argument("--hz", type=float, default=5.0, help="Polling frequency in Hz (default 5)")
     args = parser.parse_args()
 
-    # Show BLE auth QR on startup so iOS app can connect
-    name, code = generate_session()
-    print(json.dumps({"type": "session", "name": name, "code": code}), flush=True)
-
-    # Print QR with name+code per QR spec
-    qr_payload = json.dumps({"name": name, "code": code})
-    qr = qrcode.QRCode(border=1)
-    qr.add_data(qr_payload)
-    qr.make()
-    qr.print_ascii(invert=True)
+    # start_peripheral prints session + QR and starts BLE
 
     # Load config and create transformer
     config = load_config(args.config)
@@ -159,26 +147,8 @@ def main() -> int:
         signal.signal(signal.SIGINT, lambda *_: stop_run_loop())
         signal.signal(signal.SIGTERM, lambda *_: stop_run_loop())
 
-    # Run BLE peripheral appropriate to platform (lazy import to avoid macOS deps on Linux)
     try:
-        system = platform.system().lower()
-        distro = ""
-        if system == "linux":
-            try:
-                with open("/etc/os-release", "r", encoding="utf-8") as f:
-                    content = f.read().lower()
-                    if "ubuntu" in content:
-                        distro = "ubuntu"
-            except Exception:
-                pass
-        if system == "darwin":
-            from voodoo_core.ble_peripheral_macos import run_macos_peripheral  # lazy import
-            run_macos_peripheral(name, code, evt_cb)
-        elif system == "linux" and distro == "ubuntu":
-            from voodoo_core.ble_peripheral_ubuntu import run_ubuntu_peripheral  # lazy import
-            run_ubuntu_peripheral(name, code, evt_cb)
-        else:
-            raise RuntimeError(f"Unsupported platform for BLE peripheral: {platform.platform()}")
+        start_peripheral(evt_cb)
     except Exception as e:
         print(json.dumps({"type": "error", "message": f"BLE peripheral failed: {e}"}), flush=True)
     return 0
