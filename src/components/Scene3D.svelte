@@ -114,7 +114,6 @@
   <T.Color attach={'background'} args={[0x0b0f17]} />
   <T.AmbientLight intensity={0.6} />
   <T.DirectionalLight position={[1, 1, 1]} intensity={0.9} />
-
   <!-- Axes helper and labels -->
   <!-- Axes helper length 0.5m, colors: x=red, y=green, z=blue -->
   <T.AxesHelper args={[0.5]} />
@@ -136,15 +135,13 @@
     <T.MeshStandardMaterial attach={'material'} color={0x2dd4bf} metalness={0.1} roughness={0.6} />
   </T.Mesh>
 
-  
+  <Grid sectionSize={0} cellColor="#3a3a3a" plane="xy" />
 
-  <T.PerspectiveCamera position={[1.0, 0.9, 1.0]} fov={36} makeDefault target={[0, 0, 0]}>
+  <T.PerspectiveCamera up={[0, 0, 1]} position={[1.0, -1.0, 1.0]} fov={36} makeDefault target={[0, 0, 0]}>
     <OrbitControls>
       <Gizmo placement={'bottom-left'} size={86} />
     </OrbitControls>
   </T.PerspectiveCamera>
-
-  <Grid sectionSize={0} cellColor="#3a3a3a" />
 </Canvas>
 </div>
 
