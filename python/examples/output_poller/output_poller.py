@@ -153,8 +153,11 @@ def main() -> int:
             except Exception:
                 pass
 
-    signal.signal(signal.SIGINT, lambda *_: stop_run_loop())
-    signal.signal(signal.SIGTERM, lambda *_: stop_run_loop())
+    # Only install CoreFoundation stop handler on macOS; on other platforms,
+    # keep default SIGINT behavior so Ctrl+C raises KeyboardInterrupt.
+    if CF is not None:
+        signal.signal(signal.SIGINT, lambda *_: stop_run_loop())
+        signal.signal(signal.SIGTERM, lambda *_: stop_run_loop())
 
     # Run BLE peripheral appropriate to platform (lazy import to avoid macOS deps on Linux)
     try:

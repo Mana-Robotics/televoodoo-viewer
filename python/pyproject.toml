@@ -12,6 +12,7 @@ dependencies = [
   "qrcode",
   "pyobjc; sys_platform == 'darwin'",
   "dbus-next; sys_platform == 'linux'",
+  "bluezero; sys_platform == 'linux'",
 ]
 authors = [{ name = "Voodoo Control" }]
 
