@@ -39,6 +39,64 @@ fn find_bundled_python_dir(app: &tauri::AppHandle) -> Option<std::path::PathBuf>
 
 #[tauri::command]
 async fn start_python(app: tauri::AppHandle) -> Result<(), String> {
+    // In dev builds, run directly from the repo's python dir and venv
+    if cfg!(debug_assertions) {
+        let dev_python = std::path::Path::new("../python/.venv/bin/python");
+        let python = if dev_python.exists() { dev_python.to_string_lossy().to_string() } else { "python3".to_string() };
+
+        let mut cmd = Command::new(python);
+        cmd.arg("-m").arg("voodoo_core").current_dir("../python");
+
+        // Ensure pyobjc on macOS for dev
+        #[cfg(target_os = "macos")]
+        {
+            if let Ok(status) = Command::new(&cmd.get_program())
+                .args(["-c", "import objc"]) // simple import test
+                .current_dir(cmd.get_current_dir().unwrap_or_else(|| std::path::Path::new(".")))
+                .status()
+            {
+                if !status.success() {
+                    let _ = Command::new(&cmd.get_program())
+                        .args(["-m", "pip", "install", "pyobjc"])
+                        .current_dir(cmd.get_current_dir().unwrap_or_else(|| std::path::Path::new(".")))
+                        .status();
+                }
+            }
+        }
+
+        let mut child = cmd
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .map_err(|e| e.to_string())?;
+
+        let stdout = child.stdout.take();
+        let stderr = child.stderr.take();
+        let app_handle = app.clone();
+        std::thread::spawn(move || {
+            if let Some(stdout) = stdout {
+                let reader = BufReader::new(stdout);
+                for line in reader.lines() {
+                    if let Ok(line) = line {
+                        let _ = app_handle.emit("python-line", line);
+                    }
+                }
+            }
+        });
+        let app_handle_err = app.clone();
+        std::thread::spawn(move || {
+            if let Some(stderr) = stderr {
+                let reader = BufReader::new(stderr);
+                for line in reader.lines() {
+                    if let Ok(line) = line {
+                        let _ = app_handle_err.emit("python-error", line);
+                    }
+                }
+            }
+        });
+        return Ok(());
+    }
+
     // Bootstrap a runtime venv under app data dir on first run using bundled Resources/python
     let mut python = "python3".to_string();
     if let Ok(app_data_dir) = app.path().app_data_dir() {
@@ -71,7 +129,7 @@ async fn start_python(app: tauri::AppHandle) -> Result<(), String> {
             python = runtime_python.to_string_lossy().to_string();
         }
     }
-    // Fallbacks: packaged venv, dev venv, system python3
+    // Fallbacks (packaged): packaged venv, then system python3
     if python == "python3" {
         if let Some(bundled_py) = find_bundled_python_dir(&app) {
             let packaged = bundled_py.join(".venv").join("bin").join("python");
@@ -80,36 +138,20 @@ async fn start_python(app: tauri::AppHandle) -> Result<(), String> {
             }
         }
     }
-    if python == "python3" {
-        let dev_venv = std::path::Path::new("../python/.venv/bin/python");
-        if dev_venv.exists() {
-            python = dev_venv.to_string_lossy().to_string();
-        }
-    }
 
     let mut cmd = Command::new(python);
     cmd.arg("-m").arg("voodoo_core");
 
-    // Prefer Resources/python (if valid), then runtime app_data/python (if valid), else repo path
-    let mut set_cwd = false;
+    // Packaged: prefer bundled Resources/python, else runtime app_data/python
     if let Some(bundled_py) = find_bundled_python_dir(&app) {
-            if bundled_py.join("pyproject.toml").exists() {
+        if bundled_py.join("pyproject.toml").exists() {
             cmd.current_dir(&bundled_py);
-            set_cwd = true;
         }
-    }
-    if !set_cwd {
-        if let Ok(app_data_dir) = app.path().app_data_dir() {
-            let python_dir = app_data_dir.join("python");
-            if python_dir.join("pyproject.toml").exists() {
-                cmd.current_dir(&python_dir);
-                set_cwd = true;
-            }
+    } else if let Ok(app_data_dir) = app.path().app_data_dir() {
+        let python_dir = app_data_dir.join("python");
+        if python_dir.join("pyproject.toml").exists() {
+            cmd.current_dir(&python_dir);
         }
-    }
-    if !set_cwd {
-        // during `tauri dev`, the CWD is typically `src-tauri`, so go up one level
-        cmd.current_dir("../python");
     }
 
     // Only ensure pyobjc on macOS; Linux must not try to install it
