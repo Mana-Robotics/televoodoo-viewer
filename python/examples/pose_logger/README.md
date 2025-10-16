@@ -6,23 +6,22 @@ The script uses the built-in simulator for convenience. In your project, replace
 
 #### Install and run
 
-Install the local package into your active venv (from the repo root or the `python` folder):
+Install the local package into your active venv (from the `python/` folder):
 
 ```bash
-cd /Users/daniel/Code/mana/voodoo-control/VoodooControlDesktop/python
-pip install .
+pip install -e .
 ```
 
-Then run the example (simulated input -> prints transformed JSON):
+Then run the example (from the `python/` folder, simulated input -> prints transformed JSON):
 
 ```bash
-python /Users/daniel/Code/mana/voodoo-control/VoodooControlDesktop/python/examples/pose_logger/pose_logger.py
+python examples/pose_logger/pose_logger.py
 ```
 
 Optionally provide a JSON config (same format saved by the app):
 
 ```bash
-python /Users/daniel/Code/mana/voodoo-control/VoodooControlDesktop/python/examples/pose_logger/pose_logger.py --config ./output-config.json
+python examples/pose_logger/pose_logger.py --config ./output-config.json
 ```
 
 #### BLE peripheral mode (macOS)
@@ -30,7 +29,7 @@ python /Users/daniel/Code/mana/voodoo-control/VoodooControlDesktop/python/exampl
 Start a BLE peripheral that advertises the Voodoo Control service. This prints a session name and code, runs a service heartbeat, and blocks in the CoreBluetooth run loop. Requires macOS and `pyobjc` (already listed in `python/requirements.txt`).
 
 ```bash
-python /Users/daniel/Code/mana/voodoo-control/VoodooControlDesktop/python/examples/pose_logger/pose_logger.py --ble
+python examples/pose_logger/pose_logger.py --ble
 ```
 
 After starting, the program prints an ASCII QR code that encodes a JSON payload like `{"name":"prsntrXX","code":"ABC123"}` (see `SPECS/QR_CODE_READING_GUIDE.md`). Scan this to obtain the current peripheral name and access code.
