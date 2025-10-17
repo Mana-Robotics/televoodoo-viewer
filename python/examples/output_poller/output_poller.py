@@ -6,71 +6,8 @@ import time
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-from voodoo_core import Pose, OutputConfig, PoseTransformer
+from voodoo_core import Pose, PoseTransformer
 from voodoo_core.ble import generate_session, start_peripheral
-
-
-def load_config(path: Optional[str]) -> OutputConfig:
-    if not path:
-        return OutputConfig(
-            includeFormats={
-                "absolute_input": True,
-                "delta_input": False,
-                "absolute_transformed": True,
-                "delta_transformed": False,
-            },
-            includeOrientation={
-                "quaternion": True,
-                "euler_radian": False,
-                "euler_degree": False,
-            },
-            scale=1.0,
-            outputAxes={"x": 1.0, "y": 1.0, "z": 1.0},
-        )
-
-    # Resolve config path; if relative, also try next to this script
-    p = Path(path)
-    if not p.is_absolute() and not p.exists():
-        alt = Path(__file__).parent.joinpath(path)
-        if alt.exists():
-            p = alt
-    data: Dict[str, Any] = json.loads(p.read_text())
-    tf_deg = data.get("targetFrameDegrees")
-    targetFrame = None
-    if tf_deg:
-        # convert degrees to radians for runtime config
-        import math
-        targetFrame = {
-            "x": float(tf_deg.get("x", 0.0)),
-            "y": float(tf_deg.get("y", 0.0)),
-            "z": float(tf_deg.get("z", 0.0)),
-            "x_rot": math.radians(float(tf_deg.get("x_rot_deg", 0.0))),
-            "y_rot": math.radians(float(tf_deg.get("y_rot_deg", 0.0))),
-            "z_rot": math.radians(float(tf_deg.get("z_rot_deg", 0.0))),
-        }
-    else:
-        tf = data.get("targetFrame")
-        if tf:
-            targetFrame = tf
-
-    return OutputConfig(
-        includeFormats=data.get(
-            "includeFormats",
-            {
-                "absolute_input": True,
-                "delta_input": False,
-                "absolute_transformed": True,
-                "delta_transformed": False,
-            },
-        ),
-        includeOrientation=data.get(
-            "includeOrientation",
-            {"quaternion": True, "euler_radian": False, "euler_degree": False},
-        ),
-        scale=float(data.get("scale", 1.0)),
-        outputAxes=data.get("outputAxes", {"x": 1.0, "y": 1.0, "z": 1.0}),
-        targetFrame=targetFrame,
-    )
 
 
 def main() -> int:
@@ -82,12 +19,12 @@ def main() -> int:
     # start_peripheral prints session + QR and starts BLE
 
     # Load config and create transformer
-    config = load_config(args.config)
-    transformer = PoseTransformer(config)
+    voodoo_config = PoseTransformer.load_config(args.config)
+    voodoo_transformer = PoseTransformer(voodoo_config)
 
     # Shared latest pose
-    latest: Dict[str, Any] = {}
-    latest_lock = threading.Lock()
+    voodoo_latest_pose: Dict[str, Any] = {}
+    voodoo_latest_pose_lock = threading.Lock()
 
     # BLE event callback: feed incoming poses into transformer; mirror events to stdout
     def evt_cb(evt: Dict[str, Any]) -> None:
@@ -110,10 +47,10 @@ def main() -> int:
                 )
             except Exception:
                 return
-            out = transformer.transform(pose)
-            with latest_lock:
-                latest.clear()
-                latest.update(out)
+            out = voodoo_transformer.transform(pose)
+            with voodoo_latest_pose_lock:
+                voodoo_latest_pose.clear()
+                voodoo_latest_pose.update(out)
 
     # Poller at requested frequency (background thread)
     period = 1.0 / max(0.1, float(args.hz))
