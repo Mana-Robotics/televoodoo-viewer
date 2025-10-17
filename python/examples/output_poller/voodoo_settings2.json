@@ -7,8 +7,8 @@
   },
   "includeOrientation": {
     "quaternion": true,
-    "euler_radian": false,
-    "euler_degree": false
+    "euler_radian": true,
+    "euler_degree": true
   },
   "scale": 1,
   "outputAxes": {
@@ -17,9 +17,9 @@
     "z": 1
   },
   "targetFrameDegrees": {
-    "x": 0,
-    "y": 0,
-    "z": 1,
+    "x": 0.5,
+    "y": 0.5,
+    "z": 0.5,
     "x_rot_deg": 0,
     "y_rot_deg": 0,
     "z_rot_deg": 0
