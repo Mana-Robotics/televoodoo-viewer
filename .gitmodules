@@ -1,0 +1,3 @@
+[submodule "python/televoodoo"]
+	path = python/televoodoo
+	url = https://github.com/Mana-Robotics/televoodoo
