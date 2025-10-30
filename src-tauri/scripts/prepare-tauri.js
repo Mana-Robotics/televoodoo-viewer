@@ -21,8 +21,21 @@ function copyRecursive(src, dest) {
 
 const repoRoot = path.resolve(__dirname, '..', '..');
 const pythonSrc = path.join(repoRoot, 'python');
+const televoodooSrc = path.join(pythonSrc, 'televoodoo');
 const resourcesDir = path.join(__dirname, '..', 'resources', 'python');
+const televoodooResources = path.join(resourcesDir, 'televoodoo');
 
+// Ensure a clean replacement of televoodoo contents on each run
+try {
+  if (fs.existsSync(televoodooResources)) {
+    fs.rmSync(televoodooResources, { recursive: true, force: true });
+    console.log('[prepare-tauri] Removed existing televoodoo in resources');
+  }
+} catch (e) {
+  console.warn('[prepare-tauri] Failed to remove existing televoodoo:', e?.message || e);
+}
+
+// Copy the entire python directory (including televoodoo submodule)
 copyRecursive(pythonSrc, resourcesDir);
 console.log(`[prepare-tauri] Copied python -> ${resourcesDir}`);
 
@@ -39,10 +52,17 @@ try {
   execSync(`"${pyBin}" -m pip install -U pip wheel`, { stdio: 'inherit' });
 
   console.log('[prepare-tauri] Installing requirements...');
-  execSync(`"${pipBin}" install -r "${path.join(pythonSrc, 'requirements.txt')}"`, { stdio: 'inherit' });
+  const reqFile = path.join(televoodooResources, 'requirements.txt');
+  if (fs.existsSync(reqFile)) {
+    execSync(`"${pipBin}" install -U -r "${reqFile}"`, { stdio: 'inherit' });
+  }
 
-  console.log('[prepare-tauri] Installing local package...');
-  execSync(`"${pipBin}" install "${pythonSrc}"`, { stdio: 'inherit' });
+  console.log('[prepare-tauri] Installing local televoodoo package...');
+  if (fs.existsSync(televoodooResources)) {
+    execSync(`"${pipBin}" install -U "${televoodooResources}"`, { stdio: 'inherit' });
+  } else {
+    console.warn('[prepare-tauri] televoodoo directory not found in resources, skipping package install');
+  }
 } catch (e) {
   console.warn('[prepare-tauri] Skipped venv creation or installation due to error:', e?.message || e);
 }

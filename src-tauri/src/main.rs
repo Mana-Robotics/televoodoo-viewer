@@ -41,11 +41,33 @@ fn find_bundled_python_dir(app: &tauri::AppHandle) -> Option<std::path::PathBuf>
 async fn start_python(app: tauri::AppHandle) -> Result<(), String> {
     // In dev builds, run directly from the repo's python dir and venv
     if cfg!(debug_assertions) {
-        let dev_python = std::path::Path::new("../python/.venv/bin/python");
-        let python = if dev_python.exists() { dev_python.to_string_lossy().to_string() } else { "python3".to_string() };
+        // Resolve repo root at compile time (this is the src-tauri dir); go up one to project root
+        let repo_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .ok_or_else(|| "Could not determine repo root".to_string())?
+            .to_path_buf();
 
-        let mut cmd = Command::new(python);
-        cmd.arg("-m").arg("voodoo_core").current_dir("../python");
+        let python_dir = repo_root.join("python");
+        let dev_python = python_dir.join(".venv").join("bin").join("python");
+        let python = if dev_python.exists() {
+            dev_python.to_string_lossy().to_string()
+        } else {
+            "python3".to_string()
+        };
+
+        let televoodoo_dir = python_dir.join("televoodoo");
+        if !televoodoo_dir.exists() {
+            return Err(format!("televoodoo directory not found at: {}", televoodoo_dir.display()));
+        }
+        let televoodoo_src = televoodoo_dir.join("src");
+        if !televoodoo_src.exists() {
+            return Err(format!("televoodoo src directory not found at: {}", televoodoo_src.display()));
+        }
+
+        let mut cmd = Command::new(&python);
+        cmd.arg("-m").arg("televoodoo")
+            .current_dir(&televoodoo_dir)
+            .env("PYTHONPATH", televoodoo_src.to_string_lossy().to_string());
 
         // Ensure pyobjc on macOS for dev
         #[cfg(target_os = "macos")]
@@ -108,19 +130,21 @@ async fn start_python(app: tauri::AppHandle) -> Result<(), String> {
         if !runtime_python.exists() {
             // Only bootstrap from bundled resources if they actually contain a Python package (pyproject.toml)
             if let Some(bundled) = find_bundled_python_dir(&app) {
-                let pyproject = bundled.join("pyproject.toml");
+                let televoodoo_dir = bundled.join("televoodoo");
+                let pyproject = televoodoo_dir.join("pyproject.toml");
                 if pyproject.exists() {
                     let _ = std::fs::create_dir_all(&runtime_py_dir);
-                    let _ = copy_dir_all(&bundled, &runtime_py_dir);
+                    let runtime_televoodoo = runtime_py_dir.join("televoodoo");
+                    let _ = copy_dir_all(&televoodoo_dir, &runtime_televoodoo);
                     let _ = Command::new("python3").arg("-m").arg("venv").arg(runtime_py_dir.join(".venv")).status();
                     if runtime_pip.exists() {
                         let _ = Command::new(&runtime_python).arg("-m").arg("pip").arg("install").arg("-U").arg("pip").status();
-                        let req = runtime_py_dir.join("requirements.txt");
+                        let req = televoodoo_dir.join("requirements.txt");
                         if req.exists() {
                             let _ = Command::new(&runtime_python).arg("-m").arg("pip").arg("install").arg("-r").arg(&req).status();
                         }
-                        // Install the local package so `-m voodoo_core` works
-                        let _ = Command::new(&runtime_python).arg("-m").arg("pip").arg("install").arg(&runtime_py_dir).status();
+                        // Install the local package so `-m televoodoo` works
+                        let _ = Command::new(&runtime_python).arg("-m").arg("pip").arg("install").arg(&runtime_televoodoo).status();
                     }
                 }
             }
@@ -140,17 +164,18 @@ async fn start_python(app: tauri::AppHandle) -> Result<(), String> {
     }
 
     let mut cmd = Command::new(python);
-    cmd.arg("-m").arg("voodoo_core");
+    cmd.arg("-m").arg("televoodoo");
 
-    // Packaged: prefer bundled Resources/python, else runtime app_data/python
+    // Packaged: prefer bundled Resources/python/televoodoo, else runtime app_data/python/televoodoo
     if let Some(bundled_py) = find_bundled_python_dir(&app) {
-        if bundled_py.join("pyproject.toml").exists() {
-            cmd.current_dir(&bundled_py);
+        let televoodoo_bundled = bundled_py.join("televoodoo");
+        if televoodoo_bundled.join("pyproject.toml").exists() {
+            cmd.current_dir(&televoodoo_bundled);
         }
     } else if let Ok(app_data_dir) = app.path().app_data_dir() {
-        let python_dir = app_data_dir.join("python");
-        if python_dir.join("pyproject.toml").exists() {
-            cmd.current_dir(&python_dir);
+        let televoodoo_runtime = app_data_dir.join("python").join("televoodoo");
+        if televoodoo_runtime.join("pyproject.toml").exists() {
+            cmd.current_dir(&televoodoo_runtime);
         }
     }
 

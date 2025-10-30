@@ -1,5 +1,0 @@
-pyobjc; sys_platform == "darwin"
-dbus-next; sys_platform == "linux"
-dbus-python; sys_platform == "linux"
-bluezero; sys_platform == "linux"
-qrcode

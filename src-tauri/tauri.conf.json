@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "identifier": "com.voodoo.control.receiver",
   "build": {
-    "beforeDevCommand": "vite",
+    "beforeDevCommand": "node ./src-tauri/scripts/prepare-tauri.js && vite",
     "devUrl": "http://localhost:5173",
     "beforeBuildCommand": "node ./src-tauri/scripts/prepare-tauri.js && vite build",
     "frontendDist": "../dist"
