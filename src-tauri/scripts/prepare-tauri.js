@@ -9,6 +9,9 @@ const __dirname = path.dirname(__filename);
 function copyRecursive(src, dest) {
   if (!fs.existsSync(src)) return;
   const stat = fs.statSync(src);
+  const base = path.basename(src);
+  // Skip virtual environments and git metadata
+  if (base === '.venv' || base === '.git') return;
   if (stat.isDirectory()) {
     if (!fs.existsSync(dest)) fs.mkdirSync(dest, { recursive: true });
     for (const entry of fs.readdirSync(src)) {
@@ -30,6 +33,12 @@ try {
   if (fs.existsSync(televoodooResources)) {
     fs.rmSync(televoodooResources, { recursive: true, force: true });
     console.log('[prepare-tauri] Removed existing televoodoo in resources');
+  }
+  // Also ensure packaged venv is recreated fresh (avoid copying source .venv)
+  const packagedVenv = path.join(resourcesDir, '.venv');
+  if (fs.existsSync(packagedVenv)) {
+    fs.rmSync(packagedVenv, { recursive: true, force: true });
+    console.log('[prepare-tauri] Removed existing resources venv');
   }
 } catch (e) {
   console.warn('[prepare-tauri] Failed to remove existing televoodoo:', e?.message || e);

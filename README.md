@@ -1,4 +1,4 @@
-# Voodoo Control Receiver
+# Televoodoo Viewer
 
 Cross-platform desktop app built with Tauri + Svelte + Threlte and a Python core module.
 

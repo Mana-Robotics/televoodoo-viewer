@@ -1,4 +1,4 @@
-Please help me create a cross platform desktop application titled "Voodoo Control Receiver" with the following specs:
+Please help me create a cross platform desktop application titled "Televoodoo Viewer" with the following specs:
 
 
 ## PLATFORM, COMPATIBILITY, TECH STACK

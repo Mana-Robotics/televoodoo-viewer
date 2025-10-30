@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Voodoo Control Receiver",
+  "productName": "Televoodoo Viewer",
   "version": "0.1.0",
-  "identifier": "com.voodoo.control.receiver",
+  "identifier": "com.mana.televoodoo.viewer",
   "build": {
     "beforeDevCommand": "node ./src-tauri/scripts/prepare-tauri.js && vite",
     "devUrl": "http://localhost:5173",
@@ -13,7 +13,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "Voodoo Control Receiver",
+        "title": "Televoodoo Viewer",
         "width": 1280,
         "height": 800,
         "resizable": true

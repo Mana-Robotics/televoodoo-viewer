@@ -1,8 +1,8 @@
 [package]
-name = "voodoo-control-receiver"
+name = "televoodoo-viewer"
 version = "0.1.0"
-description = "Voodoo Control Receiver"
-authors = ["Daniel"]
+description = "Televoodoo Viewer"
+authors = ["Daniel Hammer <hello@mana-robotics.com>"]
 edition = "2021"
 
 [build-dependencies]
