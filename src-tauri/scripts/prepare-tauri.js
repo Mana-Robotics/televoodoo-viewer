@@ -48,6 +48,31 @@ try {
 copyRecursive(pythonSrc, resourcesDir);
 console.log(`[prepare-tauri] Copied python -> ${resourcesDir}`);
 
+// Ensure a dev venv at python/.venv for local development runs
+const repoVenvDir = path.join(pythonSrc, '.venv');
+try {
+  const repoPy = path.join(repoVenvDir, 'bin', 'python');
+  const repoPip = path.join(repoVenvDir, 'bin', 'pip');
+
+  if (!fs.existsSync(repoPy)) {
+    console.log('[prepare-tauri] Creating dev virtual environment at python/.venv ...');
+    execSync(`python3 -m venv "${repoVenvDir}"`, { stdio: 'inherit' });
+  } else {
+    console.log('[prepare-tauri] Dev virtual environment already present');
+  }
+
+  console.log('[prepare-tauri] Upgrading pip in dev venv ...');
+  execSync(`"${repoPy}" -m pip install -U pip wheel`, { stdio: 'inherit' });
+
+  const repoReq = path.join(televoodooSrc, 'requirements.txt');
+  if (fs.existsSync(repoReq)) {
+    console.log('[prepare-tauri] Installing Python requirements into dev venv ...');
+    execSync(`"${repoPip}" install -U -r "${repoReq}"`, { stdio: 'inherit' });
+  }
+} catch (e) {
+  console.warn('[prepare-tauri] Skipped dev venv setup due to error:', e?.message || e);
+}
+
 // Create a venv inside resources and install dependencies and the local package
 const venvDir = path.join(resourcesDir, '.venv');
 try {
