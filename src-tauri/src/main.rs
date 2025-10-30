@@ -119,7 +119,7 @@ async fn start_python(app: tauri::AppHandle) -> Result<(), String> {
         return Ok(());
     }
 
-    // Bootstrap a runtime venv under app data dir on first run using bundled Resources/python
+    // Always prefer a runtime venv under App Support and bootstrap it from bundled Resources if missing.
     let mut python = "python3".to_string();
     if let Ok(app_data_dir) = app.path().app_data_dir() {
         let runtime_py_dir = app_data_dir.join("python");
@@ -128,7 +128,6 @@ async fn start_python(app: tauri::AppHandle) -> Result<(), String> {
         let runtime_pip = runtime_venv_bin.join("pip");
 
         if !runtime_python.exists() {
-            // Only bootstrap from bundled resources if they actually contain a Python package (pyproject.toml)
             if let Some(bundled) = find_bundled_python_dir(&app) {
                 let televoodoo_dir = bundled.join("televoodoo");
                 let pyproject = televoodoo_dir.join("pyproject.toml");
@@ -143,7 +142,6 @@ async fn start_python(app: tauri::AppHandle) -> Result<(), String> {
                         if req.exists() {
                             let _ = Command::new(&runtime_python).arg("-m").arg("pip").arg("install").arg("-r").arg(&req).status();
                         }
-                        // Install the local package so `-m televoodoo` works
                         let _ = Command::new(&runtime_python).arg("-m").arg("pip").arg("install").arg(&runtime_televoodoo).status();
                     }
                 }
@@ -151,15 +149,6 @@ async fn start_python(app: tauri::AppHandle) -> Result<(), String> {
         }
         if runtime_python.exists() {
             python = runtime_python.to_string_lossy().to_string();
-        }
-    }
-    // Fallbacks (packaged): packaged venv, then system python3
-    if python == "python3" {
-        if let Some(bundled_py) = find_bundled_python_dir(&app) {
-            let packaged = bundled_py.join(".venv").join("bin").join("python");
-            if packaged.exists() {
-                python = packaged.to_string_lossy().to_string();
-            }
         }
     }
 

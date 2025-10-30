@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>NSBluetoothAlwaysUsageDescription</key>
+  <string>Televoodoo Viewer uses Bluetooth to communicate with the Televoodoo App (iOS/Android).</string>
+  <key>NSBluetoothPeripheralUsageDescription</key>
+  <string>Televoodoo Viewer requires Bluetooth to communicate with the Televoodoo App (iOS/Android).</string>
+</dict>
+</plist>
+
+
