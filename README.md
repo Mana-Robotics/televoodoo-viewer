@@ -1,12 +1,8 @@
 <p align="center">
-  <img src="src-tauri/icons/128x128@2x.png" alt="Televoodoo Logo" width="256" />
+  <img src="media/Televoodoo-Viewer-Banner.png" alt="Televoodoo Viewer screenshot" />
 </p>
 
-<h1 align="center">
-    <p>Televoodoo Viewer</p>
-</h1>
-
-Televoodoo Viewer is a cross‑platform desktop application built around the Python package [televoodoo](https://github.com/Mana-Robotics/televoodoo) for fast, visual testing and configuration. It hosts a BLE peripheral that the Televoodoo mobile app (iOS/Android) connects to, streams 6‑DoF pose and scene data, and renders them in an interactive 3D view. The viewer lets you inspect both input and transformed poses and export configuration files compatible with [televoodoo](https://github.com/Mana-Robotics/televoodoo) for use in other projects. The app is built with Tauri, Svelte, and Threlte, with a Python sidecar providing core [televoodoo](https://github.com/Mana-Robotics/televoodoo) functionality.
+**Televoodoo Viewer** is a cross‑platform desktop application built around the Python package [televoodoo](https://github.com/Mana-Robotics/televoodoo) for fast, visual testing and configuration. It hosts a BLE peripheral that the Televoodoo mobile app (iOS/Android) connects to, streams 6‑DoF pose and scene data, and renders them in an interactive 3D view. The viewer lets you inspect both input and transformed poses and export configuration files compatible with [televoodoo](https://github.com/Mana-Robotics/televoodoo) for use in other projects. The app is built with Tauri, Svelte, and Threlte, with a Python sidecar providing core [televoodoo](https://github.com/Mana-Robotics/televoodoo) functionality.
 
 <p align="center">
   <img src="media/televoodoo-viewer-screenshot.png" alt="Televoodoo Viewer screenshot" width="60%" />
