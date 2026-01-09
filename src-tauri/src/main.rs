@@ -1,9 +1,14 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use std::io::{BufRead, BufReader};
-use std::process::{Command, Stdio};
+use std::process::{Child, Command, Stdio};
+use std::sync::Mutex;
+use std::time::Duration;
 use tauri::Emitter;
 use tauri::Manager; // for app.path()
+
+// Global storage for Python child process to enable cleanup on exit
+static PYTHON_CHILD: Mutex<Option<Child>> = Mutex::new(None);
 
 // simple recursive copy helper for bootstrapping runtime python from resources
 fn copy_dir_all(src: &std::path::Path, dst: &std::path::Path) -> std::io::Result<()> {
@@ -101,6 +106,16 @@ async fn start_python(app: tauri::AppHandle) -> Result<(), String> {
 
         let stdout = child.stdout.take();
         let stderr = child.stderr.take();
+        
+        // Store child process for cleanup on exit
+        if let Ok(mut guard) = PYTHON_CHILD.lock() {
+            // Kill any existing Python process first
+            if let Some(mut old_child) = guard.take() {
+                let _ = old_child.kill();
+            }
+            *guard = Some(child);
+        }
+        
         let app_handle = app.clone();
         std::thread::spawn(move || {
             if let Some(stdout) = stdout {
@@ -209,6 +224,15 @@ async fn start_python(app: tauri::AppHandle) -> Result<(), String> {
     let stdout = child.stdout.take();
     let stderr = child.stderr.take();
 
+    // Store child process for cleanup on exit
+    if let Ok(mut guard) = PYTHON_CHILD.lock() {
+        // Kill any existing Python process first
+        if let Some(mut old_child) = guard.take() {
+            let _ = old_child.kill();
+        }
+        *guard = Some(child);
+    }
+
     let app_handle = app.clone();
     std::thread::spawn(move || {
         if let Some(stdout) = stdout {
@@ -237,14 +261,54 @@ async fn start_python(app: tauri::AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+/// Cleanup function to gracefully terminate the Python child process
+fn cleanup_python() {
+    if let Ok(mut guard) = PYTHON_CHILD.lock() {
+        if let Some(mut child) = guard.take() {
+            // On Unix, send SIGTERM first for graceful shutdown
+            #[cfg(unix)]
+            {
+                let pid = child.id() as i32;
+                // Send SIGTERM (15) for graceful shutdown
+                unsafe { libc::kill(pid, libc::SIGTERM); }
+                // Give it a moment to clean up
+                std::thread::sleep(Duration::from_millis(200));
+                // Check if it exited, if not, force kill
+                match child.try_wait() {
+                    Ok(Some(_)) => return, // Already exited
+                    _ => {
+                        let _ = child.kill(); // Force kill
+                        let _ = child.wait();
+                    }
+                }
+            }
+            #[cfg(not(unix))]
+            {
+                let _ = child.kill();
+                let _ = child.wait();
+            }
+        }
+    }
+}
+
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_shell::init())
         .invoke_handler(tauri::generate_handler![start_python])
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::Destroyed = event {
+                if window.label() == "main" {
+                    cleanup_python();
+                }
+            }
+        })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+    
+    // Also cleanup on normal exit
+    cleanup_python();
 }
 
 
