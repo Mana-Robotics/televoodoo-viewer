@@ -9,15 +9,15 @@ The Voodoo Control app displays a QR code that contains the connection informati
 The QR code contains a JSON string with the following structure:
 ```json
 {
-  "name": "prsntrXX",
+  "name": "voodooXX",
   "code": "ABCDEF"
 }
 ```
 
 ### Field Descriptions
 - **name** (string): The BLE peripheral's advertised local name
-  - Format: `prsntr` + 2-character random suffix
-  - Example: `"prsntrA3"`, `"prsntrX7"`, `"prsntrZ9"`
+  - Format: `voodoo` + 2-character random suffix
+  - Example: `"voodooA3"`, `"voodooX7"`, `"voodooZ9"`
 - **code** (string): The 6-character access code for authentication
   - Format: 6 alphanumeric characters (A-Z, 0-9)
   - Example: `"ABC123"`, `"XYZ789"`, `"DEF456"`
@@ -25,7 +25,7 @@ The QR code contains a JSON string with the following structure:
 ### Example QR Code Content
 ```json
 {
-  "name": "prsntrA3",
+  "name": "voodooA3",
   "code": "XYZ789"
 }
 ```
@@ -57,7 +57,7 @@ function parseQRCode(qrCodeString) {
 }
 
 // Usage
-const qrData = parseQRCode('{"name":"prsntrA3","code":"XYZ789"}');
+const qrData = parseQRCode('{"name":"voodooA3","code":"XYZ789"}');
 console.log('Peripheral Name:', qrData.peripheralName);
 console.log('Access Code:', qrData.accessCode);
 ```
@@ -78,7 +78,7 @@ def parse_qr_code(qr_code_string):
         return None
 
 # Usage
-qr_data = parse_qr_code('{"name":"prsntrA3","code":"XYZ789"}')
+qr_data = parse_qr_code('{"name":"voodooA3","code":"XYZ789"}')
 print('Peripheral Name:', qr_data['peripheral_name'])
 print('Access Code:', qr_data['access_code'])
 ```
@@ -174,7 +174,7 @@ function validateQRCodeData(data) {
     return { valid: false, error: 'Missing or invalid code field' };
   }
   
-  if (!data.name.startsWith('prsntr')) {
+  if (!data.name.startsWith('voodoo')) {
     return { valid: false, error: 'Invalid peripheral name format' };
   }
   
@@ -204,19 +204,19 @@ Use these example QR code contents for testing:
 ```json
 // Example 1
 {
-  "name": "prsntrA3",
+  "name": "voodooA3",
   "code": "ABC123"
 }
 
 // Example 2
 {
-  "name": "prsntrX7",
+  "name": "voodooX7",
   "code": "XYZ789"
 }
 
 // Example 3
 {
-  "name": "prsntrZ9",
+  "name": "voodooZ9",
   "code": "DEF456"
 }
 ```
@@ -229,7 +229,7 @@ function generateTestQRData() {
   const randomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
   
   return JSON.stringify({
-    name: `prsntr${randomSuffix}`,
+    name: `voodoo${randomSuffix}`,
     code: randomCode
   });
 }
@@ -303,7 +303,7 @@ function initializeQRScanner() {
 ### Debug Steps
 1. **Verify QR code content** by scanning with a generic QR reader
 2. **Check JSON format** matches the expected structure
-3. **Validate field values** (name starts with "prsntr", code is 6 characters)
+3. **Validate field values** (name starts with "voodoo", code is 6 characters)
 4. **Test BLE connection** using the parsed data
 5. **Monitor app logs** for authentication and connection details
 

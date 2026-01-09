@@ -9,7 +9,7 @@ The app expects the following JSON structure to be sent via the BLE characterist
 
 ```json
 {
-  "pose_start": true|false,
+  "movement_start": true|false,
   "x": 0.0,
   "y": 0.0,
   "z": 0.0,
@@ -25,7 +25,7 @@ The app expects the following JSON structure to be sent via the BLE characterist
 
 ### Field Descriptions (reference/world coordinates)
 
-- **pose_start** (boolean): Indicates whether pose tracking is active
+- **movement_start** (boolean): When true, sets this pose as the new origin for delta calculations
 - **x** (double): Position along X-axis (in meters)
 - **y** (double): Position along Y-axis (in meters)
 - **z** (double): Position along Z-axis (in meters)
@@ -42,7 +42,7 @@ The app expects the following JSON structure to be sent via the BLE characterist
 ### Active Pose Tracking
 ```json
 {
-  "pose_start": true,
+  "movement_start": true,
   "x": 0.1,
   "y": 0.2,
   "z": 0.05,
@@ -59,7 +59,7 @@ The app expects the following JSON structure to be sent via the BLE characterist
 ### Inactive Pose Tracking
 ```json
 {
-  "pose_start": false,
+  "movement_start": false,
   "x": 0.0,
   "y": 0.0,
   "z": 0.0,

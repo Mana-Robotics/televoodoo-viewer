@@ -61,3 +61,10 @@ npm run tauri:build
 - BLE API: see SPECS/BLUETOOTH_API_DOCUMENTATION.md
 - Input pose data: see SPECS/INPUT_POSE_DATA_FORMAT.md
 - Coordinate systems: World coordinate system equals the reference coordinate system (defined by the scanned ArUco-Marker). The 3D cuboid uses INPUT pose values (reference/world) directly. OUTPUT transforms only affect JSON output.
+
+## Maintainer
+
+Developed with ❤️ for 🤖 by [Mana Robotics](https://www.mana-robotics.com).
+## License
+
+MIT License — see [LICENSE](LICENSE) for details.

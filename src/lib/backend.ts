@@ -52,7 +52,7 @@ export async function startPythonSidecar() {
           const ai = msg.data?.absolute_input;
           if (ai) {
             const pose = {
-              pose_start: !!ai.pose_start,
+              movement_start: !!ai.movement_start,
               x: Number(ai.x ?? 0),
               y: Number(ai.y ?? 0),
               z: Number(ai.z ?? 0),

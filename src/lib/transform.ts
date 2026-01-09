@@ -23,15 +23,15 @@ export function computeOutput(
   config: OutputConfig,
   origin: Pose | null
 ): { output: OutputPayload; newOrigin: Pose | null } {
-  // Start of a new pose stream: when pose_start is true, always reset origin
+  // Start of a new movement: when movement_start is true, always reset origin
   // to this first frame, regardless of whether an origin already exists.
-  let newOrigin = pose.pose_start ? { ...pose } : origin;
+  let newOrigin = pose.movement_start ? { ...pose } : origin;
 
   const include = config.includeFormats;
   const includeOri = config.includeOrientation;
 
   const absolute_input: Record<string, unknown> = {
-    pose_start: pose.pose_start,
+    movement_start: pose.movement_start,
     x: pose.x,
     y: pose.y,
     z: pose.z,

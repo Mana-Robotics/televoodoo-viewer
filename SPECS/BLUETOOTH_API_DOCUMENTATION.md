@@ -44,12 +44,53 @@ Voodoo Control is an application that acts as a Bluetooth Low Energy (BLE) perip
 - **Purpose**: Monitor connection status
 - **Data Format**: 4-byte little-endian UInt32 counter
 
+#### 5. Command Data Characteristic
+- **UUID**: `1C8FD138-FC18-4846-954D-E509366AEF66`
+- **Properties**: Write, WriteWithoutResponse
+- **Purpose**: Send command data to the peripheral
+- **Data Format**: UTF-8 JSON string containing command name and value
+
+##### Command JSON Format
+```json
+{
+  "command_name": value
+}
+```
+
+##### Supported Commands
+| Command Name | Value Type | Description |
+|-------------|------------|-------------|
+| `recording` | boolean | Starts (`true`) or stops (`false`) recording |
+| `keep_recording` | boolean | Keep (`true`) or discard (`false`) the last recording |
+
+##### Example Payloads
+
+**Start Recording**
+```json
+{"recording":true}
+```
+
+**Stop Recording**
+```json
+{"recording":false}
+```
+
+**Keep Recording**
+```json
+{"keep_recording":true}
+```
+
+**Discard Recording**
+```json
+{"keep_recording":false}
+```
+
 ## Pose Data JSON Format
 
 ### Required JSON Structure
 ```json
 {
-  "pose_start": true|false,
+  "movement_start": true|false,
   "x": 0.0,
   "y": 0.0,
   "z": 0.0,
@@ -64,7 +105,7 @@ Voodoo Control is an application that acts as a Bluetooth Low Energy (BLE) perip
 ```
 
 ### Field Descriptions
-- **pose_start** (boolean): Indicates whether pose tracking is active
+- **movement_start** (boolean): When true, sets this pose as the new origin for delta calculations
 - **x** (double): Position along X-axis (in meters)
 - **y** (double): Position along Y-axis (in meters)
 - **z** (double): Position along Z-axis (in meters)
@@ -81,7 +122,7 @@ Voodoo Control is an application that acts as a Bluetooth Low Energy (BLE) perip
 #### Active Pose Tracking
 ```json
 {
-  "pose_start": true,
+  "movement_start": true,
   "x": 0.1,
   "y": 0.2,
   "z": 0.05,
@@ -98,7 +139,7 @@ Voodoo Control is an application that acts as a Bluetooth Low Energy (BLE) perip
 #### Inactive Pose Tracking
 ```json
 {
-  "pose_start": false,
+  "movement_start": false,
   "x": 0.0,
   "y": 0.0,
   "z": 0.0,
@@ -116,8 +157,8 @@ Voodoo Control is an application that acts as a Bluetooth Low Energy (BLE) perip
 
 ### 1. Discovery
 - Scan for BLE devices advertising the service UUID: `1C8FD138-FC18-4846-954D-E509366AEF61`
-- The peripheral advertises with a local name pattern: `prsntr[XX]` where `[XX]` is a random 2-character suffix
-- Example advertised name: `prsntrA3`
+- The peripheral advertises with a local name pattern: `voodoo[XX]` where `[XX]` is a random 2-character suffix
+- Example advertised name: `voodooA3`
 
 ### 2. Connection
 - Connect to the discovered peripheral
@@ -234,7 +275,7 @@ Use the provided test JSON payloads to verify your implementation:
 ```json
 // Test active pose
 {
-  "pose_start": true,
+  "movement_start": true,
   "x": 100.5,
   "y": 200.25,
   "z": 50.75,
@@ -245,7 +286,7 @@ Use the provided test JSON payloads to verify your implementation:
 
 // Test inactive pose
 {
-  "pose_start": false,
+  "movement_start": false,
   "x": 0.0,
   "y": 0.0,
   "z": 0.0,

@@ -1,5 +1,5 @@
 export type Pose = {
-  pose_start: boolean;
+  movement_start: boolean;
   x: number;
   y: number;
   z: number;
@@ -28,6 +28,8 @@ export type OutputConfig = {
   outputAxes: { x: number; y: number; z: number };
   // Pose of Target Coordinate System relative to reference/world (Euler radians)
   targetFrame?: { x: number; y: number; z: number; x_rot: number; y_rot: number; z_rot: number };
+  // Authentication credentials (optional)
+  authCredentials?: { name?: string; code?: string };
 };
 
 
