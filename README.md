@@ -27,26 +27,17 @@
       curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
       ```
 - Ubuntu
+  - Install build tools and system dependencies:
+    ```
+    sudo apt-get update
+    sudo apt-get install -y build-essential python3-dev libdbus-1-dev libglib2.0-dev libcairo2-dev libwebkit2gtk-4.1-dev libgtk-3-dev libpango1.0-dev python3-venv
+    ```
   - Install Node.js: node, nvm and npm.
     - Download from the official site: see Node.js downloads (https://nodejs.org/en/download)
     - Install according to instructions
   - Rust toolchain: Use rustup (recommended).
     ```
     curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-    ```
-  - On Debian/Ubuntu, install the venv package for your Python:
-
-    Generic (uses the distro default Python 3):
-
-    ```
-    sudo apt install -y python3-venv
-    ```
-
-    Or match the exact minor version of your current python3:
-
-    ```
-    v=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
-    sudo apt install -y python${v}-venv
     ```
 
 ## Install
