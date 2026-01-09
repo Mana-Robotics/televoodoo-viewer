@@ -28,6 +28,20 @@ Televoodoo Viewer is a cross‑platform desktop application for visualizing and 
     ```
     curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
     ```
+  - On Debian/Ubuntu, install the venv package for your Python:
+
+    Generic (uses the distro default Python 3):
+
+    ```
+    sudo apt install -y python3-venv
+    ```
+
+    Or match the exact minor version of your current python3:
+
+    ```
+    v=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
+    sudo apt install -y python${v}-venv
+    ```
 
 ## Install
 1. Clone the repository

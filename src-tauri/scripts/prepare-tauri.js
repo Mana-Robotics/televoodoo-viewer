@@ -54,9 +54,11 @@ try {
   const repoPy = path.join(repoVenvDir, 'bin', 'python');
   const repoPip = path.join(repoVenvDir, 'bin', 'pip');
 
+  const isLinux = process.platform === 'linux';
   if (!fs.existsSync(repoPy)) {
     console.log('[prepare-tauri] Creating dev virtual environment at python/.venv ...');
-    execSync(`python3 -m venv "${repoVenvDir}"`, { stdio: 'inherit' });
+    const venvFlags = isLinux ? '--system-site-packages' : '';
+    execSync(`python3 -m venv ${venvFlags} "${repoVenvDir}"`, { stdio: 'inherit' });
   } else {
     console.log('[prepare-tauri] Dev virtual environment already present');
   }
@@ -68,6 +70,18 @@ try {
   if (fs.existsSync(repoReq)) {
     console.log('[prepare-tauri] Installing Python requirements into dev venv ...');
     execSync(`"${repoPip}" install -U -r "${repoReq}"`, { stdio: 'inherit' });
+  }
+
+  // On Linux, verify that dbus is importable; if not, print a helpful hint
+  if (isLinux) {
+    try {
+      execSync(`"${repoPy}" - <<'PY'\nimport importlib, sys\nimportlib.import_module('dbus')\nprint('dbus ok')\nPY`, { stdio: 'inherit', shell: '/bin/bash' });
+    } catch (e) {
+      console.warn('[prepare-tauri] Python module "dbus" not available. If install fails via pip, install system packages:');
+      console.warn('[prepare-tauri]   sudo apt update && sudo apt install -y python3-dbus python3-gi');
+      console.warn('[prepare-tauri] Or install build deps then pip install dbus-python:');
+      console.warn('[prepare-tauri]   sudo apt install -y libdbus-1-dev libglib2.0-dev && "' + repoPip + '" install dbus-python');
+    }
   }
 } catch (e) {
   console.warn('[prepare-tauri] Skipped dev venv setup due to error:', e?.message || e);

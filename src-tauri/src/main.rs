@@ -86,6 +86,13 @@ async fn start_python(app: tauri::AppHandle) -> Result<(), String> {
             }
         }
 
+        // AppImage and some launchers may inject Python-related env vars that break venvs.
+        // For dev, we KEEP PYTHONPATH (we set it above) but sanitize the rest.
+        cmd.env_remove("PYTHONHOME")
+            .env_remove("PYTHONEXECUTABLE")
+            .env_remove("PYTHONUSERBASE")
+            .env("PYTHONUNBUFFERED", "1");
+
         let mut child = cmd
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
@@ -184,6 +191,13 @@ async fn start_python(app: tauri::AppHandle) -> Result<(), String> {
             }
         }
     }
+
+    // Clean up Python-related env vars that AppImage sets (PYTHONHOME, PYTHONPATH, ...)
+    cmd.env_remove("PYTHONHOME")
+        .env_remove("PYTHONPATH")
+        .env_remove("PYTHONEXECUTABLE")
+        .env_remove("PYTHONUSERBASE")
+        .env("PYTHONUNBUFFERED", "1");
 
     let mut child = cmd
         .stdout(Stdio::piped())
