@@ -12,7 +12,8 @@
     { "identifier": "fs:allow-write", "scopes": ["**"] },
     { "identifier": "fs:allow-write-file", "scopes": ["**"] },
     { "identifier": "fs:allow-write-text-file", "scopes": ["**"] },
-    { "identifier": "fs:allow-mkdir", "scopes": ["**"] }
+    { "identifier": "fs:allow-mkdir", "scopes": ["**"] },
+    "shell:allow-open"
   ]
 }
 
