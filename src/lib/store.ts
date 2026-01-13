@@ -1,9 +1,36 @@
 import { writable } from 'svelte/store';
 import type { Pose, OutputConfig } from './types';
 
-export const bleStatus = writable<'disconnected' | 'connecting' | 'connected'>('disconnected');
-export const connectionName = writable<string>('voodoo??');
-export const accessCode = writable<string>('______');
+// Service state: 'stopped' = config view, 'running' = active view
+export const serviceState = writable<'stopped' | 'running'>('stopped');
+
+// Connection configuration
+export type ConnectionType = 'wifi' | 'ble';
+export interface ServiceConfig {
+  connection: ConnectionType;
+  useCustomCredentials: boolean;
+  customName: string;
+  customCode: string;
+}
+export const serviceConfig = writable<ServiceConfig>({
+  connection: 'wifi',
+  useCustomCredentials: false,
+  customName: '',
+  customCode: '',
+});
+
+// Active connection info (set when service starts)
+export const connectionType = writable<ConnectionType>('wifi');
+export const connectionStatus = writable<'disconnected' | 'connecting' | 'connected'>('disconnected');
+export const connectionName = writable<string>('');
+export const accessCode = writable<string>('');
+export const wifiIp = writable<string>('');
+export const wifiPort = writable<number>(50000);
+
+// Legacy alias for backward compatibility
+export const bleStatus = connectionStatus;
+
+// Pose data
 export const inputPose = writable<Pose>({ movement_start: false, x: 0, y: 0, z: 0, x_rot: 0, y_rot: 0, z_rot: 0, qx: 0, qy: 0, qz: 0, qw: 1 });
 export const outputJson = writable<Record<string, unknown>>({});
 export const outputConfig = writable<OutputConfig | null>(null);

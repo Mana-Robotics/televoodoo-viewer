@@ -42,8 +42,19 @@ fn find_bundled_python_dir(app: &tauri::AppHandle) -> Option<std::path::PathBuf>
     None
 }
 
+/// Configuration for starting the Python sidecar
+#[derive(serde::Deserialize)]
+struct StartConfig {
+    /// Connection type: "wifi" or "ble"
+    connection: String,
+    /// Peripheral/server name (optional - uses random if not provided)
+    name: Option<String>,
+    /// Authentication code (optional - uses random if not provided)
+    code: Option<String>,
+}
+
 #[tauri::command]
-async fn start_python(app: tauri::AppHandle) -> Result<(), String> {
+async fn start_python(app: tauri::AppHandle, config: StartConfig) -> Result<(), String> {
     // In dev builds, run directly from the repo's python dir and venv
     if cfg!(debug_assertions) {
         // Resolve repo root at compile time (this is the src-tauri dir); go up one to project root
@@ -71,8 +82,17 @@ async fn start_python(app: tauri::AppHandle) -> Result<(), String> {
 
         let mut cmd = Command::new(&python);
         cmd.arg("-m").arg("televoodoo")
+            .arg("--connection").arg(&config.connection)
             .current_dir(&televoodoo_dir)
             .env("PYTHONPATH", televoodoo_src.to_string_lossy().to_string());
+        
+        // Add optional name and code
+        if let Some(ref name) = config.name {
+            cmd.arg("--name").arg(name);
+        }
+        if let Some(ref code) = config.code {
+            cmd.arg("--code").arg(code);
+        }
 
         // Ensure pyobjc on macOS for dev
         #[cfg(target_os = "macos")]
@@ -175,7 +195,16 @@ async fn start_python(app: tauri::AppHandle) -> Result<(), String> {
     }
 
     let mut cmd = Command::new(python);
-    cmd.arg("-m").arg("televoodoo");
+    cmd.arg("-m").arg("televoodoo")
+        .arg("--connection").arg(&config.connection);
+    
+    // Add optional name and code
+    if let Some(ref name) = config.name {
+        cmd.arg("--name").arg(name);
+    }
+    if let Some(ref code) = config.code {
+        cmd.arg("--code").arg(code);
+    }
 
     // Packaged: prefer bundled Resources/python/televoodoo, else runtime app_data/python/televoodoo
     if let Some(bundled_py) = find_bundled_python_dir(&app) {
@@ -261,6 +290,12 @@ async fn start_python(app: tauri::AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+#[tauri::command]
+async fn stop_python() -> Result<(), String> {
+    cleanup_python();
+    Ok(())
+}
+
 /// Cleanup function to gracefully terminate the Python child process
 fn cleanup_python() {
     if let Ok(mut guard) = PYTHON_CHILD.lock() {
@@ -296,7 +331,7 @@ fn main() {
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_shell::init())
-        .invoke_handler(tauri::generate_handler![start_python])
+        .invoke_handler(tauri::generate_handler![start_python, stop_python])
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::Destroyed = event {
                 if window.label() == "main" {
