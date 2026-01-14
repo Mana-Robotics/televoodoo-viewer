@@ -47,7 +47,7 @@
   <!-- Connection Type -->
   <div class="space-y-2">
     <label class="block text-sm font-medium text-gray-300">Connection Type</label>
-    <div class="flex gap-4">
+    <div class="flex gap-4 flex-wrap">
       <label class="flex items-center gap-2 cursor-pointer">
         <input 
           type="radio" 
@@ -55,7 +55,16 @@
           value="wifi" 
           class="w-4 h-4 text-blue-500 bg-gray-800 border-gray-600 focus:ring-blue-500"
         />
-        <span class="text-sm">WiFi (recommended)</span>
+        <span class="text-sm">WiFi</span>
+      </label>
+      <label class="flex items-center gap-2 cursor-pointer">
+        <input 
+          type="radio" 
+          bind:group={connectionType} 
+          value="usb" 
+          class="w-4 h-4 text-blue-500 bg-gray-800 border-gray-600 focus:ring-blue-500"
+        />
+        <span class="text-sm">USB</span>
       </label>
       <label class="flex items-center gap-2 cursor-pointer">
         <input 
@@ -69,7 +78,9 @@
     </div>
     <p class="text-xs text-gray-500">
       {#if connectionType === 'wifi'}
-        WiFi offers lower latency (~16ms) and works on all platforms.
+        WiFi offers low latency (~16ms) and works on all platforms.
+      {:else if connectionType === 'usb'}
+        USB offers lowest latency (~5-10ms). Requires USB tethering or macOS Internet Sharing.
       {:else}
         BLE works on macOS and Ubuntu. Subject to connection interval batching.
       {/if}

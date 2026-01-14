@@ -35,7 +35,28 @@ function processMessage(msg: any) {
     // ignore detailed adapter state
   } else if (msg.type === 'ble_service_added' || msg.type === 'ble_advertising' || msg.type === 'ble_advertising_started') {
     log('info', `BLE: ${msg.type}`);
-  } else if (msg.type === 'wifi_starting' || msg.type === 'wifi_listening' || msg.type === 'mdns_registered') {
+  // New unified UDP service events (WiFi and USB use same server)
+  } else if (msg.type === 'server_starting') {
+    log('info', `Server starting on ${msg.ip}:${msg.port}`);
+  } else if (msg.type === 'server_listening') {
+    log('info', `Server listening on ${msg.ip}:${msg.port}`);
+  } else if (msg.type === 'server_stopped') {
+    log('info', 'Server stopped');
+  } else if (msg.type === 'mdns_registered') {
+    log('info', `mDNS: ${msg.service} @ ${msg.ip}:${msg.port}`);
+  } else if (msg.type === 'connected') {
+    // Unified connected event from UDP server (works for both WiFi and USB)
+    lastActivityMs = Date.now();
+    setStatus('connected');
+    log('info', `Connected: ${msg.client}`);
+  } else if (msg.type === 'disconnected') {
+    // Unified disconnected event from UDP server
+    setStatus('disconnected');
+    log('info', `Disconnected: ${msg.reason || 'unknown'}`);
+  } else if (msg.type === 'session_rejected') {
+    log('warn', `Connection rejected: ${msg.reason} from ${msg.client}`);
+  // Legacy events for backward compatibility
+  } else if (msg.type === 'wifi_starting' || msg.type === 'wifi_listening') {
     log('info', `WiFi: ${msg.type}`);
   } else if (msg.type === 'wifi_connected') {
     lastActivityMs = Date.now();
@@ -46,8 +67,27 @@ function processMessage(msg: any) {
     log('info', `WiFi disconnected: ${msg.reason}`);
   } else if (msg.type === 'wifi_rejected') {
     log('warn', `WiFi rejected: ${msg.reason}`);
+  } else if (msg.type === 'usb_starting' || msg.type === 'usb_listening') {
+    log('info', `USB: ${msg.type}`);
+  } else if (msg.type === 'usb_connected') {
+    lastActivityMs = Date.now();
+    setStatus('connected');
+    log('info', `USB connected: ${msg.client}`);
+  } else if (msg.type === 'usb_disconnected') {
+    setStatus('disconnected');
+    log('info', `USB disconnected: ${msg.reason}`);
+  } else if (msg.type === 'usb_rejected') {
+    log('warn', `USB rejected: ${msg.reason}`);
   } else if (msg.type === 'service_heartbeat') {
     // ignore - only for process liveness
+  } else if (msg.type === 'usb_setup_info') {
+    log('info', 'USB: Check setup requirements for iOS/Android');
+  } else if (msg.type === 'resampling_enabled') {
+    log('info', `Resampling: ${msg.upsample_to_hz}Hz (rate limit: ${msg.rate_limit_hz || 'none'})`);
+  } else if (msg.type === 'warn') {
+    log('warn', msg.message);
+  } else if (msg.type === 'error') {
+    log('error', msg.message);
   } else if (msg.type === 'heartbeat') {
     // BLE connectivity heartbeat - don't log (high frequency)
     lastActivityMs = Date.now();
@@ -109,6 +149,8 @@ export interface StartConfig {
   connection: ConnectionType;
   name?: string;
   code?: string;
+  upsampleHz?: number;
+  rateLimitHz?: number;
 }
 
 export async function startPythonSidecar(config: StartConfig) {
@@ -163,6 +205,8 @@ export async function startPythonSidecar(config: StartConfig) {
         connection: config.connection,
         name: config.name || null,
         code: config.code || null,
+        upsample_hz: config.upsampleHz || null,
+        rate_limit_hz: config.rateLimitHz || null,
       }
     });
     log('info', 'Python sidecar started');

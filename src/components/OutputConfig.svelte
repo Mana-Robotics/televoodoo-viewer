@@ -1,6 +1,6 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte';
-  import { outputConfig } from '../lib/store';
+  import { outputConfig, upsamplingConfig, rateLimitConfig } from '../lib/store';
   const dispatch = createEventDispatcher();
 
   let includeFormats = {
@@ -20,8 +20,21 @@
   let targetPos = { x: 0, y: 0, z: 0 };
   let targetEulerDeg = { x_rot_deg: 0, y_rot_deg: 0, z_rot_deg: 0 };
 
+  // Upsampling settings
+  let upsamplingEnabled = false;
+  let upsamplingHz = 200;
+
+  // Rate limit settings
+  let rateLimitEnabled = false;
+  let rateLimitHz = 30;
+
   function toRadians(deg: number) { return (deg * Math.PI) / 180; }
   function toDegrees(rad: number) { return (rad * 180) / Math.PI; }
+
+  function emitResamplingChange() {
+    upsamplingConfig.set({ enabled: upsamplingEnabled, hz: upsamplingHz });
+    rateLimitConfig.set({ enabled: rateLimitEnabled, hz: rateLimitHz });
+  }
 
   function emitChange() {
     // This component configures OUTPUT JSON only; visualization always uses INPUT in reference/world coords
@@ -140,9 +153,40 @@
         <label class="flex items-center gap-2" for="ori-ed"><input id="ori-ed" type="checkbox" bind:checked={includeOrientation.euler_degree} on:change={emitChange}/> euler degree</label>
       </div>
     </div>
-    <!-- Visualization always uses INPUT (reference/world). No selector needed. -->
 
+    <div>
+      <div class="block mb-1" role="heading" aria-level="3">Upsampling</div>
+      <div class="space-y-2">
+        <label class="flex items-center gap-2" for="upsample-on">
+          <input id="upsample-on" type="checkbox" bind:checked={upsamplingEnabled} on:change={emitResamplingChange}/>
+          Enable upsampling
+        </label>
+        {#if upsamplingEnabled}
+          <label class="flex items-center gap-2" for="upsample-hz">
+            <input id="upsample-hz" type="number" min="1" max="1000" step="1" bind:value={upsamplingHz} class="w-20 bg-gray-900 border border-gray-700 px-2 py-1" on:change={emitResamplingChange}/>
+            <span class="text-gray-400">Hz</span>
+          </label>
+          <p class="text-xs text-gray-500">Upsamples poses using linear extrapolation for high-frequency control loops.</p>
+        {/if}
+      </div>
+    </div>
 
+    <div>
+      <div class="block mb-1" role="heading" aria-level="3">Rate Limit</div>
+      <div class="space-y-2">
+        <label class="flex items-center gap-2" for="rate-limit-on">
+          <input id="rate-limit-on" type="checkbox" bind:checked={rateLimitEnabled} on:change={emitResamplingChange}/>
+          Enable rate limit
+        </label>
+        {#if rateLimitEnabled}
+          <label class="flex items-center gap-2" for="rate-limit-hz">
+            <input id="rate-limit-hz" type="number" min="1" max="100" step="1" bind:value={rateLimitHz} class="w-20 bg-gray-900 border border-gray-700 px-2 py-1" on:change={emitResamplingChange}/>
+            <span class="text-gray-400">Hz</span>
+          </label>
+          <p class="text-xs text-gray-500">Caps output frequency by dropping excess poses.</p>
+        {/if}
+      </div>
+    </div>
   </div>
 </div>
 

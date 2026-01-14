@@ -13,7 +13,9 @@
     accessCode as accessCodeStore,
     connectionType as connectionTypeStore,
     wifiIp as wifiIpStore,
-    wifiPort as wifiPortStore
+    wifiPort as wifiPortStore,
+    upsamplingConfig as upsamplingConfigStore,
+    rateLimitConfig as rateLimitConfigStore
   } from './lib/store';
   import { open } from '@tauri-apps/plugin-shell';
   const markerUrl = new URL('../SPECS/aruco-marker.png', import.meta.url).href;
@@ -21,10 +23,12 @@
   let connectionName: string;
   let accessCode: string;
   let connectionStatus: 'disconnected' | 'connecting' | 'connected';
-  let connectionType: 'wifi' | 'ble';
+  let connectionType: 'wifi' | 'ble' | 'usb';
   let wifiIp: string;
   let wifiPort: number;
   let isRunning: boolean;
+  let upsamplingConfig: { enabled: boolean; hz: number };
+  let rateLimitConfig: { enabled: boolean; hz: number };
 
   const unsub = [
     connectionNameStore.subscribe((v) => (connectionName = v)),
@@ -34,6 +38,8 @@
     wifiIpStore.subscribe((v) => (wifiIp = v)),
     wifiPortStore.subscribe((v) => (wifiPort = v)),
     serviceState.subscribe((v) => (isRunning = v === 'running')),
+    upsamplingConfigStore.subscribe((v) => (upsamplingConfig = v)),
+    rateLimitConfigStore.subscribe((v) => (rateLimitConfig = v)),
   ];
 
   function handleConfigChange(event: CustomEvent) {
@@ -42,7 +48,12 @@
 
   async function handleStart(event: CustomEvent<StartConfig>) {
     try {
-      await startPythonSidecar(event.detail);
+      const config: StartConfig = {
+        ...event.detail,
+        upsampleHz: upsamplingConfig.enabled ? upsamplingConfig.hz : undefined,
+        rateLimitHz: rateLimitConfig.enabled ? rateLimitConfig.hz : undefined,
+      };
+      await startPythonSidecar(config);
     } catch (err) {
       console.error('Failed to start service:', err);
     }
@@ -78,7 +89,7 @@
           <div class="text-sm text-gray-300">Transport: <span class="px-2 py-0.5 rounded bg-gray-800 text-xs align-middle">{connectionType.toUpperCase()}</span></div>
           <div class="text-sm text-gray-300">Name: <span class="px-2 py-0.5 rounded bg-gray-800 text-xs align-middle">{connectionName}</span></div>
           <div class="text-sm text-gray-300">Code: <span class="px-2 py-0.5 rounded bg-gray-800 text-xs align-middle">{accessCode}</span></div>
-          {#if connectionType === 'wifi' && wifiIp}
+          {#if (connectionType === 'wifi' || connectionType === 'usb') && wifiIp}
             <div class="text-sm text-gray-300">IP: <span class="px-2 py-0.5 rounded bg-gray-800 text-xs align-middle">{wifiIp}:{wifiPort}</span></div>
           {/if}
         </div>

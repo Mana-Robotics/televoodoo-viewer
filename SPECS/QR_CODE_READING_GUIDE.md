@@ -1,7 +1,7 @@
-# Voodoo Control - QR Code Reading Guide
+# Televoodoo - QR Code Reading Guide
 
 ## Overview
-The Voodoo Control app displays a QR code that contains the connection information needed for client devices to connect via Bluetooth Low Energy (BLE). This guide explains how to read and parse the QR code data.
+The Televoodoo app displays a QR code that contains the connection information needed for the phone app to connect. The phone app supports multiple transport types (WiFi, USB, BLE) and uses mDNS for service discovery. This guide explains how to read and parse the QR code data.
 
 ## QR Code Content Format
 
@@ -10,23 +10,52 @@ The QR code contains a JSON string with the following structure:
 ```json
 {
   "name": "voodooXX",
-  "code": "ABCDEF"
+  "code": "ABCDEF",
+  "transport": "wifi"
 }
 ```
 
 ### Field Descriptions
-- **name** (string): The BLE peripheral's advertised local name
+- **name** (string): The service/peripheral name (used for mDNS discovery)
   - Format: `voodoo` + 2-character random suffix
   - Example: `"voodooA3"`, `"voodooX7"`, `"voodooZ9"`
+  - For WiFi/USB: Phone discovers via mDNS: `<name>._televoodoo._udp.local.`
+  - For BLE: Phone scans for BLE peripheral with this advertised name
 - **code** (string): The 6-character access code for authentication
   - Format: 6 alphanumeric characters (A-Z, 0-9)
   - Example: `"ABC123"`, `"XYZ789"`, `"DEF456"`
+- **transport** (string): The connection type
+  - Values: `"wifi"`, `"usb"`, or `"ble"`
+  - `"wifi"`: Connect over WiFi network (phone and computer on same network)
+  - `"usb"`: Connect over USB tethering (mDNS discovery on USB interface)
+  - `"ble"`: Connect via Bluetooth Low Energy
 
-### Example QR Code Content
+### Example QR Code Contents
+
+#### WiFi Connection
 ```json
 {
   "name": "voodooA3",
-  "code": "XYZ789"
+  "code": "XYZ789",
+  "transport": "wifi"
+}
+```
+
+#### USB Connection
+```json
+{
+  "name": "voodooB7",
+  "code": "ABC123",
+  "transport": "usb"
+}
+```
+
+#### BLE Connection
+```json
+{
+  "name": "voodooZ9",
+  "code": "DEF456",
+  "transport": "ble"
 }
 ```
 
@@ -47,8 +76,9 @@ function parseQRCode(qrCodeString) {
   try {
     const data = JSON.parse(qrCodeString);
     return {
-      peripheralName: data.name,
-      accessCode: data.code
+      serviceName: data.name,
+      accessCode: data.code,
+      transport: data.transport || 'ble'  // Default to BLE for backward compat
     };
   } catch (error) {
     console.error('Failed to parse QR code:', error);
@@ -57,9 +87,10 @@ function parseQRCode(qrCodeString) {
 }
 
 // Usage
-const qrData = parseQRCode('{"name":"voodooA3","code":"XYZ789"}');
-console.log('Peripheral Name:', qrData.peripheralName);
+const qrData = parseQRCode('{"name":"voodooA3","code":"XYZ789","transport":"wifi"}');
+console.log('Service Name:', qrData.serviceName);
 console.log('Access Code:', qrData.accessCode);
+console.log('Transport:', qrData.transport);
 ```
 
 #### Python Example
@@ -70,17 +101,19 @@ def parse_qr_code(qr_code_string):
     try:
         data = json.loads(qr_code_string)
         return {
-            'peripheral_name': data['name'],
-            'access_code': data['code']
+            'service_name': data['name'],
+            'access_code': data['code'],
+            'transport': data.get('transport', 'ble')  # Default to BLE
         }
     except json.JSONDecodeError as e:
         print(f'Failed to parse QR code: {e}')
         return None
 
 # Usage
-qr_data = parse_qr_code('{"name":"voodooA3","code":"XYZ789"}')
-print('Peripheral Name:', qr_data['peripheral_name'])
+qr_data = parse_qr_code('{"name":"voodooA3","code":"XYZ789","transport":"wifi"}')
+print('Service Name:', qr_data['service_name'])
 print('Access Code:', qr_data['access_code'])
+print('Transport:', qr_data['transport'])
 ```
 
 #### Swift Example
@@ -88,6 +121,11 @@ print('Access Code:', qr_data['access_code'])
 struct ConnectionInfo: Codable {
     let name: String
     let code: String
+    let transport: String?
+    
+    var effectiveTransport: String {
+        return transport ?? "ble"
+    }
 }
 
 func parseQRCode(_ qrCodeString: String) -> ConnectionInfo? {
@@ -101,30 +139,69 @@ func parseQRCode(_ qrCodeString: String) -> ConnectionInfo? {
 
 // Usage
 if let connectionInfo = parseQRCode(qrCodeString) {
-    print("Peripheral Name: \(connectionInfo.name)")
+    print("Service Name: \(connectionInfo.name)")
     print("Access Code: \(connectionInfo.code)")
+    print("Transport: \(connectionInfo.effectiveTransport)")
 }
 ```
 
 ## Using the QR Code Data
 
-### 1. BLE Connection Process
-1. **Scan for the peripheral** using the name from the QR code
-2. **Connect** to the discovered peripheral
-3. **Authenticate** using the access code from the QR code
-4. **Send pose data** to the authenticated connection
+### Connection Process by Transport Type
 
-### 2. Implementation Flow
+#### WiFi / USB Connection (mDNS Discovery)
+1. **Discover the service** via mDNS: `<name>._televoodoo._udp.local.`
+2. **Connect** to the discovered UDP endpoint (IP:port from mDNS TXT record)
+3. **Send HELLO** with the access code for authentication
+4. **Receive ACK** confirming connection
+5. **Send pose data** to the authenticated connection
+
+#### BLE Connection
+1. **Scan for the peripheral** using the name from the QR code
+2. **Connect** to the discovered BLE peripheral
+3. **Write to auth characteristic** with the access code
+4. **Receive auth confirmation** 
+5. **Send pose data** to the authenticated connection
+
+### Implementation Flow
+
+#### WiFi/USB Example (mDNS + UDP)
 ```javascript
 async function connectUsingQRCode(qrCodeString) {
-  // Parse QR code data
   const connectionInfo = parseQRCode(qrCodeString);
   if (!connectionInfo) {
     throw new Error('Invalid QR code format');
   }
   
-  // Scan for the peripheral
-  const peripheral = await scanForPeripheral(connectionInfo.peripheralName);
+  if (connectionInfo.transport === 'wifi' || connectionInfo.transport === 'usb') {
+    // Discover via mDNS
+    const service = await discoverMDNS(`${connectionInfo.serviceName}._televoodoo._udp.local.`);
+    
+    // Connect via UDP and authenticate
+    const socket = await connectUDP(service.ip, service.port);
+    await sendHello(socket, connectionInfo.accessCode);
+    
+    return socket;
+  } else {
+    // BLE connection
+    const peripheral = await scanForPeripheral(connectionInfo.serviceName);
+    await connectToPeripheral(peripheral);
+    await authenticateWithCode(connectionInfo.accessCode);
+    return peripheral;
+  }
+}
+```
+
+#### BLE Example
+```javascript
+async function connectBLE(qrCodeString) {
+  const connectionInfo = parseQRCode(qrCodeString);
+  if (!connectionInfo) {
+    throw new Error('Invalid QR code format');
+  }
+  
+  // Scan for the peripheral by name
+  const peripheral = await scanForPeripheral(connectionInfo.serviceName);
   
   // Connect to the peripheral
   await connectToPeripheral(peripheral);
@@ -155,9 +232,10 @@ async function connectUsingQRCode(qrCodeString) {
 
 ### Common Issues
 1. **Invalid JSON**: QR code doesn't contain valid JSON
-2. **Missing fields**: JSON doesn't contain required `name` or `code` fields
+2. **Missing fields**: JSON doesn't contain required `name`, `code`, or `transport` fields
 3. **Wrong format**: QR code contains different data structure
 4. **Scanning errors**: QR code is damaged or unreadable
+5. **mDNS discovery fails**: Service not found (check network connectivity)
 
 ### Validation
 ```javascript
@@ -175,7 +253,13 @@ function validateQRCodeData(data) {
   }
   
   if (!data.name.startsWith('voodoo')) {
-    return { valid: false, error: 'Invalid peripheral name format' };
+    return { valid: false, error: 'Invalid service name format' };
+  }
+  
+  // Validate transport if present
+  const validTransports = ['wifi', 'usb', 'ble'];
+  if (data.transport && !validTransports.includes(data.transport)) {
+    return { valid: false, error: 'Invalid transport type' };
   }
   
   return { valid: true };
@@ -202,35 +286,39 @@ function validateQRCodeData(data) {
 Use these example QR code contents for testing:
 
 ```json
-// Example 1
+// WiFi Example
 {
   "name": "voodooA3",
-  "code": "ABC123"
+  "code": "ABC123",
+  "transport": "wifi"
 }
 
-// Example 2
+// USB Example
 {
   "name": "voodooX7",
-  "code": "XYZ789"
+  "code": "XYZ789",
+  "transport": "usb"
 }
 
-// Example 3
+// BLE Example
 {
   "name": "voodooZ9",
-  "code": "DEF456"
+  "code": "DEF456",
+  "transport": "ble"
 }
 ```
 
 ### QR Code Generation for Testing
 ```javascript
 // Generate test QR code data
-function generateTestQRData() {
+function generateTestQRData(transport = 'wifi') {
   const randomSuffix = Math.random().toString(36).substring(2, 4).toUpperCase();
   const randomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
   
   return JSON.stringify({
     name: `voodoo${randomSuffix}`,
-    code: randomCode
+    code: randomCode,
+    transport: transport
   });
 }
 ```

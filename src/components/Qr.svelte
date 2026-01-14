@@ -6,6 +6,8 @@
   export let connectionName: string;
   export let accessCode: string;
   export let transport: ConnectionType = 'wifi';
+  // IP/port are kept for display purposes but not included in QR
+  // Phone app uses mDNS to discover: <name>._televoodoo._udp.local.
   export let ip: string = '';
   export let port: number = 50000;
 
@@ -15,10 +17,9 @@
   let ro: ResizeObserver | null = null;
   let renderTimeout: number | null = null;
 
-  // Build QR payload based on transport type
-  $: qrPayload = transport === 'wifi' 
-    ? JSON.stringify({ name: connectionName, code: accessCode, transport, ip, port })
-    : JSON.stringify({ name: connectionName, code: accessCode, transport });
+  // QR payload matches Python's session.py - minimal data for mDNS discovery
+  // Phone app discovers service via mDNS: <name>._televoodoo._udp.local.
+  $: qrPayload = JSON.stringify({ name: connectionName, code: accessCode, transport });
 
   async function render(width?: number) {
     if (!canvasEl) return;

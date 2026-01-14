@@ -5,7 +5,7 @@ import type { Pose, OutputConfig } from './types';
 export const serviceState = writable<'stopped' | 'running'>('stopped');
 
 // Connection configuration
-export type ConnectionType = 'wifi' | 'ble';
+export type ConnectionType = 'wifi' | 'ble' | 'usb';
 export interface ServiceConfig {
   connection: ConnectionType;
   useCustomCredentials: boolean;
@@ -17,6 +17,26 @@ export const serviceConfig = writable<ServiceConfig>({
   useCustomCredentials: false,
   customName: '',
   customCode: '',
+});
+
+// Upsampling settings
+export interface UpsamplingConfig {
+  enabled: boolean;
+  hz: number;
+}
+export const upsamplingConfig = writable<UpsamplingConfig>({
+  enabled: false,
+  hz: 200,
+});
+
+// Rate limiting settings
+export interface RateLimitConfig {
+  enabled: boolean;
+  hz: number;
+}
+export const rateLimitConfig = writable<RateLimitConfig>({
+  enabled: false,
+  hz: 30,
 });
 
 // Active connection info (set when service starts)

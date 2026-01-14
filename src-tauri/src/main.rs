@@ -7,6 +7,9 @@ use std::time::Duration;
 use tauri::Emitter;
 use tauri::Manager; // for app.path()
 
+#[cfg(unix)]
+use std::os::unix::process::CommandExt;
+
 // Global storage for Python child process to enable cleanup on exit
 static PYTHON_CHILD: Mutex<Option<Child>> = Mutex::new(None);
 
@@ -45,12 +48,16 @@ fn find_bundled_python_dir(app: &tauri::AppHandle) -> Option<std::path::PathBuf>
 /// Configuration for starting the Python sidecar
 #[derive(serde::Deserialize)]
 struct StartConfig {
-    /// Connection type: "wifi" or "ble"
+    /// Connection type: "wifi", "ble", or "usb"
     connection: String,
     /// Peripheral/server name (optional - uses random if not provided)
     name: Option<String>,
     /// Authentication code (optional - uses random if not provided)
     code: Option<String>,
+    /// Upsample poses to target frequency (Hz) using linear extrapolation
+    upsample_hz: Option<f64>,
+    /// Rate limit pose output to maximum frequency (Hz)
+    rate_limit_hz: Option<f64>,
 }
 
 #[tauri::command]
@@ -93,6 +100,13 @@ async fn start_python(app: tauri::AppHandle, config: StartConfig) -> Result<(), 
         if let Some(ref code) = config.code {
             cmd.arg("--code").arg(code);
         }
+        // Add optional upsampling and rate limiting
+        if let Some(hz) = config.upsample_hz {
+            cmd.arg("--upsample-hz").arg(hz.to_string());
+        }
+        if let Some(hz) = config.rate_limit_hz {
+            cmd.arg("--rate-limit-hz").arg(hz.to_string());
+        }
 
         // Ensure pyobjc on macOS for dev
         #[cfg(target_os = "macos")]
@@ -117,6 +131,16 @@ async fn start_python(app: tauri::AppHandle, config: StartConfig) -> Result<(), 
             .env_remove("PYTHONEXECUTABLE")
             .env_remove("PYTHONUSERBASE")
             .env("PYTHONUNBUFFERED", "1");
+
+        // On Unix, create new process group for cleaner termination
+        #[cfg(unix)]
+        unsafe {
+            cmd.pre_exec(|| {
+                // Create new process group with this process as leader
+                libc::setpgid(0, 0);
+                Ok(())
+            });
+        }
 
         let mut child = cmd
             .stdout(Stdio::piped())
@@ -205,6 +229,13 @@ async fn start_python(app: tauri::AppHandle, config: StartConfig) -> Result<(), 
     if let Some(ref code) = config.code {
         cmd.arg("--code").arg(code);
     }
+    // Add optional upsampling and rate limiting
+    if let Some(hz) = config.upsample_hz {
+        cmd.arg("--upsample-hz").arg(hz.to_string());
+    }
+    if let Some(hz) = config.rate_limit_hz {
+        cmd.arg("--rate-limit-hz").arg(hz.to_string());
+    }
 
     // Packaged: prefer bundled Resources/python/televoodoo, else runtime app_data/python/televoodoo
     if let Some(bundled_py) = find_bundled_python_dir(&app) {
@@ -242,6 +273,16 @@ async fn start_python(app: tauri::AppHandle, config: StartConfig) -> Result<(), 
         .env_remove("PYTHONEXECUTABLE")
         .env_remove("PYTHONUSERBASE")
         .env("PYTHONUNBUFFERED", "1");
+
+    // On Unix, create new process group for cleaner termination
+    #[cfg(unix)]
+    unsafe {
+        cmd.pre_exec(|| {
+            // Create new process group with this process as leader
+            libc::setpgid(0, 0);
+            Ok(())
+        });
+    }
 
     let mut child = cmd
         .stdout(Stdio::piped())
@@ -300,19 +341,27 @@ async fn stop_python() -> Result<(), String> {
 fn cleanup_python() {
     if let Ok(mut guard) = PYTHON_CHILD.lock() {
         if let Some(mut child) = guard.take() {
-            // On Unix, send SIGTERM first for graceful shutdown
             #[cfg(unix)]
             {
                 let pid = child.id() as i32;
-                // Send SIGTERM (15) for graceful shutdown
+                // First try SIGTERM for graceful shutdown
                 unsafe { libc::kill(pid, libc::SIGTERM); }
-                // Give it a moment to clean up
-                std::thread::sleep(Duration::from_millis(200));
-                // Check if it exited, if not, force kill
+                
+                // Give it a short moment to respond
+                std::thread::sleep(Duration::from_millis(100));
+                
+                // Check if it exited
                 match child.try_wait() {
-                    Ok(Some(_)) => return, // Already exited
+                    Ok(Some(_)) => return, // Already exited gracefully
                     _ => {
-                        let _ = child.kill(); // Force kill
+                        // Process didn't exit, try killing the entire process group
+                        // This ensures any child processes/threads are also killed
+                        unsafe { libc::kill(-pid, libc::SIGKILL); }
+                        
+                        // Also send SIGKILL to the specific process
+                        unsafe { libc::kill(pid, libc::SIGKILL); }
+                        
+                        // Wait for process to finish
                         let _ = child.wait();
                     }
                 }
@@ -333,10 +382,20 @@ fn main() {
         .plugin(tauri_plugin_shell::init())
         .invoke_handler(tauri::generate_handler![start_python, stop_python])
         .on_window_event(|window, event| {
-            if let tauri::WindowEvent::Destroyed = event {
-                if window.label() == "main" {
-                    cleanup_python();
+            match event {
+                // Handle close request to cleanup before window is destroyed
+                tauri::WindowEvent::CloseRequested { .. } => {
+                    if window.label() == "main" {
+                        cleanup_python();
+                    }
                 }
+                // Also handle destroyed as backup
+                tauri::WindowEvent::Destroyed => {
+                    if window.label() == "main" {
+                        cleanup_python();
+                    }
+                }
+                _ => {}
             }
         })
         .run(tauri::generate_context!())
