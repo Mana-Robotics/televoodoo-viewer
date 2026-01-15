@@ -18,7 +18,7 @@
     rateLimitConfig as rateLimitConfigStore
   } from './lib/store';
   import { open } from '@tauri-apps/plugin-shell';
-  const markerUrl = new URL('../SPECS/aruco-marker.png', import.meta.url).href;
+  const markerUrl = new URL('../assets/aruco-marker.png', import.meta.url).href;
 
   let connectionName: string;
   let accessCode: string;

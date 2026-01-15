@@ -2,11 +2,17 @@
   <img src="media/Televoodoo-Viewer-Banner.png" alt="Televoodoo Viewer screenshot" />
 </p>
 
-**Televoodoo Viewer** is a cross‑platform desktop application built around the Python package [televoodoo](https://github.com/Mana-Robotics/televoodoo) for fast, visual testing and configuration. It hosts a BLE peripheral that the Televoodoo mobile app (iOS/Android) connects to, streams 6‑DoF pose and scene data, and renders them in an interactive 3D view. The viewer lets you inspect both input and transformed poses and export configuration files compatible with [televoodoo](https://github.com/Mana-Robotics/televoodoo) for use in other projects. The app is built with Tauri, Svelte, and Threlte, with a Python sidecar providing core [televoodoo](https://github.com/Mana-Robotics/televoodoo) functionality.
+**Televoodoo Viewer** is a cross‑platform desktop application built around the Python package [televoodoo](https://github.com/Mana-Robotics/televoodoo) for fast, visual testing and configuration. It allows to configure and launch an endpoint that the Televoodoo mobile app (iOS/Android) connects to via WiFi, USB or BLE. The received poses of the phone are rendered in an interactive 3D view. The viewer lets you inspect both input and transformed poses and export configuration files compatible with [televoodoo](https://github.com/Mana-Robotics/televoodoo) for use in other projects. The app is built with Tauri, Svelte, and Threlte, with a Python sidecar providing core [televoodoo](https://github.com/Mana-Robotics/televoodoo) functionality.
 
 <p align="center">
-  <img src="media/televoodoo-viewer-screenshot.png" alt="Televoodoo Viewer screenshot" width="60%" />
+  <img src="media/televoodoo-viewer-screenshot.png" alt="Televoodoo Viewer screenshot" width="40%" />
 </p>
+
+### The Televoodoo Ecosystem
+
+- **[Televoodoo Python](https://github.com/Mana-Robotics/televoodoo-python)** (this project) — Receive 6DoF poses from the Televoodoo App via WiFi, USB, or BLE, with pose handling, coordinate transforms, and more
+- **[Televoodoo App](mailto:hello@mana-robotics.com?subject=Televoodoo%20App%3A%20Request%20for%20Test%20Access)** (iOS, Android) — 6DoF tracking phone app that streams poses at low latency via WiFi, USB, or BLE
+- **[Televoodoo Viewer](https://github.com/Mana-Robotics/televoodoo-viewer)** — Cross-platform desktop app for visual testing and config file creation 
 
 ## Requirements
 - Node 18+
@@ -68,9 +74,6 @@ npm run tauri:build
 ```
 
 ## Notes
-- QR content format: see SPECS/QR_CODE_READING_GUIDE.md
-- BLE API: see SPECS/BLUETOOTH_API_DOCUMENTATION.md
-- Input pose data: see SPECS/INPUT_POSE_DATA_FORMAT.md
 - Coordinate systems: World coordinate system equals the reference coordinate system (defined by the scanned ArUco-Marker). The 3D cuboid uses INPUT pose values (reference/world) directly. OUTPUT transforms only affect JSON output.
 
 ## Maintainer
