@@ -78,4 +78,4 @@ npm run tauri:build
 Developed with ❤️ for 🤖 by [Mana Robotics](https://www.mana-robotics.com).
 ## License
 
-MIT License — see [LICENSE](LICENSE) for details.
+Apache 2.0 License — see [LICENSE](LICENSE) for details.
