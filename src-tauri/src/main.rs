@@ -341,31 +341,46 @@ async fn stop_python() -> Result<(), String> {
 fn cleanup_python() {
     if let Ok(mut guard) = PYTHON_CHILD.lock() {
         if let Some(mut child) = guard.take() {
+            let pid = child.id();
+            
             #[cfg(unix)]
             {
-                let pid = child.id() as i32;
-                // First try SIGTERM for graceful shutdown
-                unsafe { libc::kill(pid, libc::SIGTERM); }
+                let pid_i32 = pid as i32;
                 
-                // Give it a short moment to respond
-                std::thread::sleep(Duration::from_millis(100));
+                // First try SIGTERM for graceful shutdown
+                unsafe { libc::kill(pid_i32, libc::SIGTERM); }
+                
+                // Give it a moment to respond gracefully
+                std::thread::sleep(Duration::from_millis(200));
                 
                 // Check if it exited
                 match child.try_wait() {
                     Ok(Some(_)) => return, // Already exited gracefully
                     _ => {
-                        // Process didn't exit, try killing the entire process group
-                        // This ensures any child processes/threads are also killed
-                        unsafe { libc::kill(-pid, libc::SIGKILL); }
+                        // Process didn't exit gracefully, escalate to SIGKILL
                         
-                        // Also send SIGKILL to the specific process
-                        unsafe { libc::kill(pid, libc::SIGKILL); }
+                        // Kill the process group (negative PID)
+                        unsafe { libc::kill(-pid_i32, libc::SIGKILL); }
                         
-                        // Wait for process to finish
+                        // Also kill the specific process
+                        unsafe { libc::kill(pid_i32, libc::SIGKILL); }
+                        
+                        // On macOS, use pkill to ensure any orphaned python processes
+                        // running televoodoo are also killed
+                        #[cfg(target_os = "macos")]
+                        {
+                            // Kill any python processes that are children of this PID
+                            let _ = Command::new("pkill")
+                                .args(["-9", "-P", &pid.to_string()])
+                                .status();
+                        }
+                        
+                        // Wait for the main process to finish
                         let _ = child.wait();
                     }
                 }
             }
+            
             #[cfg(not(unix))]
             {
                 let _ = child.kill();
@@ -381,27 +396,24 @@ fn main() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_shell::init())
         .invoke_handler(tauri::generate_handler![start_python, stop_python])
-        .on_window_event(|window, event| {
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|_app_handle, event| {
             match event {
-                // Handle close request to cleanup before window is destroyed
-                tauri::WindowEvent::CloseRequested { .. } => {
-                    if window.label() == "main" {
-                        cleanup_python();
-                    }
+                // RunEvent::Exit is called when the app is about to exit
+                // This is more reliable than window events for cleanup
+                tauri::RunEvent::Exit => {
+                    cleanup_python();
                 }
-                // Also handle destroyed as backup
-                tauri::WindowEvent::Destroyed => {
-                    if window.label() == "main" {
-                        cleanup_python();
-                    }
+                // Also handle ExitRequested to catch early quit attempts
+                tauri::RunEvent::ExitRequested { .. } => {
+                    cleanup_python();
                 }
                 _ => {}
             }
-        })
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        });
     
-    // Also cleanup on normal exit
+    // Final cleanup as last resort (this runs after run() returns)
     cleanup_python();
 }
 
